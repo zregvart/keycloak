@@ -1,3 +1,21 @@
+/*
+ * Copyright 2016 Analytical Graphics, Inc. and/or its affiliates
+ * and other contributors as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package org.keycloak.authentication.authenticators.x509;
 
 import org.keycloak.Config;
@@ -57,30 +75,6 @@ public class X509ClientCertificateAuthenticatorFactory implements AuthenticatorF
         for (String s : mappingSources) {
             mappingSourceTypes.add(s);
         }
-//        ProviderConfigProperty subjectDnMethod = new ProviderConfigProperty();
-//        subjectDnMethod.setType(STRING_TYPE);
-//        subjectDnMethod.setName(MAPPING_SOURCE_CERT_SUBJECTDN);
-//        subjectDnMethod.setLabel("Use SubjectDN to extract user identity");
-//        subjectDnMethod.setHelpText("Extracts user identity from X509 Certificate Subject's Distinquished Name and maps it to existing user.");
-//
-//        ProviderConfigProperty issuerDnMethod = new ProviderConfigProperty();
-//        issuerDnMethod.setType(STRING_TYPE);
-//        issuerDnMethod.setName(MAPPING_SOURCE_CERT_ISSUERDN);
-//        issuerDnMethod.setLabel("Use IssuerDN to extract user identity");
-//        issuerDnMethod.setHelpText("Extracts user identity from X509 Certificate Issuer Distinquished Name and maps it to existing user.");
-//
-//        ProviderConfigProperty thumbprintMethod = new ProviderConfigProperty();
-//        thumbprintMethod.setType(STRING_TYPE);
-//        thumbprintMethod.setName(MAPPING_SOURCE_CERT_THUMBPRINT);
-//        thumbprintMethod.setLabel("Identity based on X509 Certificate Thumbprint");
-//        thumbprintMethod.setHelpText("Maps X509 Certificate thumbprint to existing user");
-//
-//        ProviderConfigProperty serialNumberMethod = new ProviderConfigProperty();
-//        serialNumberMethod.setType(STRING_TYPE);
-//        serialNumberMethod.setName(MAPPING_SOURCE_CERT_SERIALNUMBER);
-//        serialNumberMethod.setLabel("Maps X509 Certificate serial number to existing user");
-//        serialNumberMethod.setHelpText("Certificate's serial number is mapped to existing user");
-//
         ProviderConfigProperty mappingMethodList = new ProviderConfigProperty();
         mappingMethodList.setType(ProviderConfigProperty.LIST_TYPE);
         mappingMethodList.setName(MAPPING_SOURCE_SELECTION);
@@ -94,18 +88,6 @@ public class X509ClientCertificateAuthenticatorFactory implements AuthenticatorF
         regExp.setDefaultValue(DEFAULT_CUSTOM_EXPRESSION);
         regExp.setLabel("A regular expression to extract user identity");
         regExp.setHelpText("The regular expression to extract a user identity. The expression must contain a single group. For example, 'uniqueId=(.*?)(?:,|$)' will match 'uniqueId=somebody@company.org, CN=somebody' and give somebody@company.org");
-
-//        ProviderConfigProperty attributeName = new ProviderConfigProperty();
-//        attributeName.setType(STRING_TYPE);
-//        attributeName.setName(USER_ATTRIBUTE_MAPPER);
-//        attributeName.setLabel("Map user identity to user attribute");
-//        attributeName.setHelpText("Match the user attribute to extracted user identity");
-//
-//        ProviderConfigProperty propertyName = new ProviderConfigProperty();
-//        propertyName.setType(STRING_TYPE);
-//        propertyName.setName(USER_PROPERTY_MAPPER);
-//        propertyName.setLabel("Map user identity to User Property");
-//        propertyName.setHelpText("Match the user property (e-mail, userName, etc.) to extracted user identity");
 
         List<String> mapperTypes = new LinkedList<>();
         for (String m : userModelMappers) {
@@ -122,27 +104,8 @@ public class X509ClientCertificateAuthenticatorFactory implements AuthenticatorF
         ProviderConfigProperty attributeOrPropertyValue = new ProviderConfigProperty();
         attributeOrPropertyValue.setType(STRING_TYPE);
         attributeOrPropertyValue.setName(USER_MAPPER_VALUE);
-        //attributeOrPropertyValue.setDefaultValue("email");
         attributeOrPropertyValue.setLabel("A name of user property or attribute");
         attributeOrPropertyValue.setHelpText("A name of user property or attribute");
-
-//        ProviderConfigProperty noCertChecking = new ProviderConfigProperty();
-//        noCertChecking.setType(STRING_TYPE);
-//        noCertChecking.setName(NO_CERT_CHECKING);
-//        noCertChecking.setLabel("No Certificate Revocation Checking");
-//        noCertChecking.setHelpText("No certificate revocation checking will be performed.");
-//
-//        ProviderConfigProperty crlEnabled = new ProviderConfigProperty();
-//        crlEnabled.setType(STRING_TYPE);
-//        crlEnabled.setName(ENABLE_CRL);
-//        crlEnabled.setLabel("Enable Certificate Revocation List checking");
-//        crlEnabled.setHelpText("Uses Performs certificate recovation list to check whether X509 client certificate has been revoked.");
-//
-//        ProviderConfigProperty ocspEnabled = new ProviderConfigProperty();
-//        ocspEnabled.setType(STRING_TYPE);
-//        ocspEnabled.setName(ENABLE_OCSP );
-//        ocspEnabled.setLabel("Enable Online Certificate Status Protocol");
-//        ocspEnabled.setHelpText("Use Online Certificate Status Protocol (OCSP) to check whether certificate has been revoked.");
 
         List<String> revocationMethodTypes = new LinkedList<>();
         for (String m : certificateRevocationCheckingTypes) {
@@ -169,10 +132,17 @@ public class X509ClientCertificateAuthenticatorFactory implements AuthenticatorF
         ocspResponderUri.setLabel("OCSP Responder Uri");
         ocspResponderUri.setHelpText("Clients use OCSP Responder Uri to check certificate revocation status. This value is required if the Certificate Revocation Checking Method is set to OCSP");
 
-        configProperties = asList(mappingMethodList, regExp, userMapperList, attributeOrPropertyValue, checkRevocationMethod, crlDPEnabled, ocspResponderUri);
+        ProviderConfigProperty showChallengeResponse = new ProviderConfigProperty();
+        showChallengeResponse.setType(BOOLEAN_TYPE);
+        showChallengeResponse.setName(SHOW_CHALLENGE_RESPONSE);
+        showChallengeResponse.setLabel("Require Authentication Confirmation");
+        showChallengeResponse.setHelpText("Display authentication details, whether authentication succeeded or failed. Users will also be prompted to choose whether to continue with the identity chosen based on the contents of the certificate.");
+
+        configProperties = asList(mappingMethodList, regExp, userMapperList, attributeOrPropertyValue, checkRevocationMethod, crlDPEnabled, ocspResponderUri, showChallengeResponse);
     }
 
     public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
+            AuthenticationExecutionModel.Requirement.REQUIRED,
             AuthenticationExecutionModel.Requirement.ALTERNATIVE,
             AuthenticationExecutionModel.Requirement.DISABLED
     };
