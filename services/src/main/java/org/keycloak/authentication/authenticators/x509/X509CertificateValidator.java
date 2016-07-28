@@ -1,10 +1,30 @@
+/*
+ * Copyright 2016 Analytical Graphics, Inc. and/or its affiliates
+ * and other contributors as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
 package org.keycloak.authentication.authenticators.x509;
 
+import org.bouncycastle.jcajce.provider.asymmetric.X509;
 import org.keycloak.services.ServicesLogger;
 
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -27,12 +47,14 @@ public class X509CertificateValidator {
     private boolean _enableOCSPChecking = false;
     private String _ocspResponderUri;
     private int _maximumCrtPathDepth = -1;
+    private KeyStore _trustStore = null;
 
     public static class CertificateValidatorBuilder {
 
         protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
 
         private X509CertificateValidator _validator;
+
         public CertificateValidatorBuilder(X509CertificateValidator validator) {
             _validator = validator;
         }
@@ -67,10 +89,67 @@ public class X509CertificateValidator {
             return this;
         }
 
+        TrustStoreBuilder trustStore() {
+            return new TrustStoreBuilder(_validator);
+        }
+
         X509CertificateValidator getValidator() throws GeneralSecurityException, IOException {
             return _validator;
         }
+    }
 
+    public static class TrustStoreBuilder {
+
+        private String _trustStorePath;
+        private String _trustStorePassword;
+        private String _trustStoreType;
+        private X509CertificateValidator _validator;
+
+        public TrustStoreBuilder(X509CertificateValidator validator) {
+            _validator = validator;
+        }
+
+        TrustStoreBuilder path(String trustStorePath) {
+            logger.debugf("[CertificateValidatorBuilder:trustStorePath] \"%s\"", trustStorePath);
+            _trustStorePath = trustStorePath;
+            return this;
+        }
+
+        TrustStoreBuilder password(String trustStorePassword) {
+            logger.debugf("[CertificateValidatorBuilder:trustStorePassword] \"%s\"", trustStorePassword);
+            _trustStorePassword = trustStorePassword;
+            return this;
+        }
+
+        TrustStoreBuilder type(String trustStoreType) {
+            logger.debugf("[CertificateValidatorBuilder:trustStoreType] \"%s\"", trustStoreType);
+            _trustStoreType = trustStoreType;
+            return this;
+        }
+
+        X509CertificateValidator getValidator() throws GeneralSecurityException, IOException {
+
+            KeyStore trustStore;
+
+            if (_trustStoreType == null) {
+                _trustStoreType = KeyStore.getDefaultType();
+            }
+            if (_trustStorePath != null && _trustStorePassword != null) {
+                try {
+                    FileInputStream myKeys = new FileInputStream(_trustStorePath);
+                    trustStore = KeyStore.getInstance(_trustStoreType);
+                    trustStore.load(myKeys, _trustStorePassword.toCharArray());
+                    myKeys.close();
+
+                    _validator.setTrustStore(trustStore);
+                }
+                catch (Exception ex) {
+                    logger.error("[CertificateValidatorBuilder:getValidator] Exception's been caught while trying to load a trust store", ex);
+                }
+            }
+
+            return _validator;
+        }
     }
 
     public static CertificateValidatorBuilder fromConfig(Map<String, String> parameters) {
@@ -109,6 +188,11 @@ public class X509CertificateValidator {
         }
 
         return builder;
+    }
+
+
+    protected void setTrustStore(KeyStore trustStore) {
+        _trustStore = trustStore;
     }
 
     /**
@@ -157,21 +241,41 @@ public class X509CertificateValidator {
      */
     public void check(X509Certificate[] certChain) throws GeneralSecurityException {
 
+        certChain[0].checkValidity();
+
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(
                 TrustManagerFactory.getDefaultAlgorithm());
 
-        tmf.init((KeyStore)null);
+        if (_trustStore == null) {
+            // Initialize trust manager factory with a default trust store
+            tmf.init((KeyStore) null);
+        }
+        else {
+            tmf.init(_trustStore);
+        }
 
         for (TrustManager tm : tmf.getTrustManagers()) {
             if (tm instanceof X509TrustManager) {
                 X509TrustManager trustManager = (X509TrustManager)tm;
 
-                logger.infof("[X509CertificateValidator:check] Certificate algorithm: \"%s\"",
-                    certChain[0].getSigAlgName());
+                dumpAcceptedIssuers(trustManager.getAcceptedIssuers());
 
-                trustManager.checkClientTrusted(certChain, null/*certChain[0].getSigAlgName()*/);
+                logger.debugf("[X509CertificateValidator:check] Algorithm: \"%s\", Issuer: \"%s\"",
+                    certChain[0].getSigAlgName(), certChain[0].getIssuerDN().getName());
+
+                trustManager.checkClientTrusted(certChain, "RSA"/*certChain[0].getSigAlgName()*/);
+                // If no exception is thrown, the certificate is valid
+                break;
             }
         }
+    }
+
+    private void dumpAcceptedIssuers(X509Certificate[] acceptedIssuers) {
+        logger.debug("[X509CertificateValidator:dumpAcceptedIssuers] > list of accepted issuers");
+        for (X509Certificate issuer : acceptedIssuers) {
+            logger.debugf("[X509CertificateValidator:dumpAcceptedIssuers] accepted issuer: \"%s\"", issuer.getSubjectDN().getName());
+        }
+        logger.debug("[X509CertificateValidator:dumpAcceptedIssuers] < end of list of accepted issuers");
     }
 
 }
