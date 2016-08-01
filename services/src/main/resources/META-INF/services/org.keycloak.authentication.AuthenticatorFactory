@@ -34,4 +34,6 @@ org.keycloak.authentication.authenticators.broker.IdpEmailVerificationAuthentica
 org.keycloak.authentication.authenticators.broker.IdpUsernamePasswordFormFactory
 org.keycloak.authentication.authenticators.browser.ConditionalOtpFormAuthenticatorFactory
 org.keycloak.protocol.saml.profile.ecp.authenticator.HttpBasicAuthenticator
+org.keycloak.authentication.authenticators.x509.ValidateX509CertificateThumbprint
 org.keycloak.authentication.authenticators.x509.X509ClientCertificateAuthenticatorFactory
+org.keycloak.authentication.authenticators.x509.ValidateX509CertificateUsernameFactory
