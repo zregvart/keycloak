@@ -25,19 +25,13 @@ import org.keycloak.models.KeycloakSession;
 /**
  * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
- *
+ * @date 7/31/2016
  */
-public class X509ClientCertificateAuthenticatorFactory  extends AbstractX509ClientCertificateAuthenticatorFactory {
 
-    public static final String PROVIDER_ID = "auth-x509-client-username-form";
-    public static final X509ClientCertificateAuthenticator SINGLETON =
-            new X509ClientCertificateAuthenticator();
+public class ValidateX509CertificateUsernameFactory extends AbstractX509ClientCertificateAuthenticatorFactory {
 
-    public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
-            AuthenticationExecutionModel.Requirement.ALTERNATIVE,
-            AuthenticationExecutionModel.Requirement.DISABLED
-    };
-
+    public static final String PROVIDER_ID = "direct-grant-auth-x509-username";
+    public static final ValidateX509CertificateUsername SINGLETON = new ValidateX509CertificateUsername();
 
     @Override
     public String getHelpText() {
@@ -46,14 +40,16 @@ public class X509ClientCertificateAuthenticatorFactory  extends AbstractX509Clie
 
     @Override
     public String getDisplayType() {
-        return "X509/Validate Username Form";
+        return "X509/Validate Username";
     }
 
+    public static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
+            AuthenticationExecutionModel.Requirement.REQUIRED
+    };
     @Override
     public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
         return REQUIREMENT_CHOICES;
     }
-
 
     @Override
     public Authenticator create(KeycloakSession session) {
