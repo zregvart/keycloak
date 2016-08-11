@@ -54,12 +54,12 @@ public abstract class UserIdentityExtractor {
             Matcher m = r.matcher(value);
 
             if (!m.find()) {
-                logger.warnf("[PatternMatcher:extract] No matches were found for input \"%s\", pattern=\"%s\"", value, _pattern);
+                logger.debugf("[PatternMatcher:extract] No matches were found for input \"%s\", pattern=\"%s\"", value, _pattern);
                 return null;
             }
 
             if (m.groupCount() != 1) {
-                logger.warnf("[PatternMatcher:extract] Match produced more than a single group for input \"%s\", pattern=\"%s\"", value, _pattern);
+                logger.debugf("[PatternMatcher:extract] Match produced more than a single group for input \"%s\", pattern=\"%s\"", value, _pattern);
                 return null;
             }
 

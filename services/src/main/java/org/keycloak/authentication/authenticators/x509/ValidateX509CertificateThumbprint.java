@@ -30,7 +30,6 @@ import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.services.ServicesLogger;
 
 import javax.ws.rs.core.Response;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
