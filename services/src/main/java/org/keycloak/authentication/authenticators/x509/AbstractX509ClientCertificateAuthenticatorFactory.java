@@ -55,12 +55,6 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
             USERNAME_EMAIL_MAPPER
     };
 
-    private static final String[] certificateRevocationCheckingTypes = {
-            NO_CERT_CHECKING,
-            ENABLE_CRL,
-            ENABLE_OCSP
-    };
-
     protected static final List<ProviderConfigProperty> configProperties;
     static {
         List<String> mappingSourceTypes = new LinkedList<>();
@@ -99,40 +93,58 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         attributeOrPropertyValue.setType(STRING_TYPE);
         attributeOrPropertyValue.setName(CUSTOM_ATTRIBUTE_NAME);
         attributeOrPropertyValue.setDefaultValue(DEFAULT_ATTRIBUTE_NAME);
-        attributeOrPropertyValue.setLabel("A name of user property or attribute");
-        attributeOrPropertyValue.setHelpText("A name of user property or attribute");
+        attributeOrPropertyValue.setLabel("A name of user attribute");
+        attributeOrPropertyValue.setHelpText("A name of user attribute to map the extracted user identity to existing user. The name must be a valid, existing user attribute if User Mapping Method is set to Custom Attribute Mapper.");
 
-        List<String> revocationMethodTypes = new LinkedList<>();
-        for (String m : certificateRevocationCheckingTypes) {
-            revocationMethodTypes.add(m);
-        }
-
-        ProviderConfigProperty checkRevocationMethod = new ProviderConfigProperty();
-        checkRevocationMethod.setType(ProviderConfigProperty.LIST_TYPE);
-        checkRevocationMethod.setName(CERTIFICATE_CHECK_REVOCATION_METHOD);
-        checkRevocationMethod.setHelpText("Choose how to or whether to check for X509 certificate revocation. CRL means that certificate revocation list will be used to check for certificate revocation, OCSP will use online certificate status protocol.");
-        checkRevocationMethod.setLabel("Certificate Revocation Checking Strategy");
-        checkRevocationMethod.setDefaultValue(certificateRevocationCheckingTypes[0]);
-        checkRevocationMethod.setDefaultValue(revocationMethodTypes);
+        ProviderConfigProperty crlCheckingEnabled = new ProviderConfigProperty();
+        crlCheckingEnabled.setType(BOOLEAN_TYPE);
+        crlCheckingEnabled.setName(ENABLE_CRL);
+        crlCheckingEnabled.setHelpText("Enable Certificate Revocation Checking using CRL");
+        crlCheckingEnabled.setLabel("CRL Checking Enabled");
 
         ProviderConfigProperty crlDPEnabled = new ProviderConfigProperty();
         crlDPEnabled.setType(BOOLEAN_TYPE);
         crlDPEnabled.setName(ENABLE_CRLDP);
         crlDPEnabled.setDefaultValue(false);
-        crlDPEnabled.setLabel("Enable Certificate Revocation List Distribution Point to check certificate revocation status");
+        crlDPEnabled.setLabel("Enable CRL Distribution Point to check certificate revocation status");
         crlDPEnabled.setHelpText("CRL Distribution Point is a starting point for CRL. CDP is optional, but most PKI authorities include CDP in their certificates.");
+
+        ProviderConfigProperty cRLRelativePath = new ProviderConfigProperty();
+        cRLRelativePath.setType(STRING_TYPE);
+        cRLRelativePath.setName(CRL_RELATIVE_PATH);
+        cRLRelativePath.setDefaultValue("crl.pem");
+        cRLRelativePath.setLabel("CRL File path.");
+        cRLRelativePath.setHelpText("The path to a CRL file that contains a list of revoked certificates. Paths are assumed to be relative to $jboss.server.config.dir");
+
+        ProviderConfigProperty oCspCheckingEnabled = new ProviderConfigProperty();
+        oCspCheckingEnabled.setType(BOOLEAN_TYPE);
+        oCspCheckingEnabled.setName(ENABLE_OCSP);
+        oCspCheckingEnabled.setHelpText("Enable Certificate Revocation Checking using OCSP");
+        oCspCheckingEnabled.setLabel("OCSP Checking Enabled");
 
         ProviderConfigProperty ocspResponderUri = new ProviderConfigProperty();
         ocspResponderUri.setType(STRING_TYPE);
         ocspResponderUri.setName(OCSPRESPONDER_URI);
         ocspResponderUri.setLabel("OCSP Responder Uri");
-        ocspResponderUri.setHelpText("Clients use OCSP Responder Uri to check certificate revocation status. This value is required if the Certificate Revocation Checking Method is set to OCSP");
+        ocspResponderUri.setHelpText("Clients use OCSP Responder Uri to check certificate revocation status.");
+
+        ProviderConfigProperty keyUsage = new ProviderConfigProperty();
+        keyUsage.setType(STRING_TYPE);
+        keyUsage.setName(CERTIFICATE_KEY_USAGE);
+        keyUsage.setLabel("Validate Key Usage");
+        keyUsage.setHelpText("Validates that the purpose of the key contained in the certificate (encipherment, signature, etc.) matches its intended purpose. Leaving the field blank will disable Key Usage validation. For example, 'digitalSignature, keyEncipherment' will check if the digitalSignature and keyEncipherment bits (bit 0 and bit 2 respectively) are set in certificate's X509 Key Usage extension. See RFC 5280 for a detailed definition of X509 Key Usage extension.");
+
+        ProviderConfigProperty extendedKeyUsage = new ProviderConfigProperty();
+        extendedKeyUsage.setType(STRING_TYPE);
+        extendedKeyUsage.setName(CERTIFICATE_EXTENDED_KEY_USAGE);
+        extendedKeyUsage.setLabel("Validate Extended Key Usage");
+        extendedKeyUsage.setHelpText("Validates the extended purposes of the certificate's key using certificate's Extended Key Usage extension. Leaving the field blank will disable Extended Key Usage validation. See RFC 5280 for a detailed definition of X509 Extended Key Usage extension.");
 
         ProviderConfigProperty trustStorePath = new ProviderConfigProperty();
         trustStorePath.setType(STRING_TYPE);
         trustStorePath.setName(TRUSTSTORE_PATH);
         trustStorePath.setLabel("Trust Store");
-        trustStorePath.setHelpText("A path to a trust store that will be used to validate X509 client certificates");
+        trustStorePath.setHelpText("A path to a trust store that will be used to validate X509 client certificates. Path is relative to $jboss.server.config.dir.");
 
         ProviderConfigProperty trustStorePassword = new ProviderConfigProperty();
         trustStorePassword.setType(PASSWORD);
@@ -145,15 +157,19 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         trustStoreType.setName(TRUSTSTORE_TYPE);
         trustStoreType.setDefaultValue(KeyStore.getDefaultType());
         trustStoreType.setLabel("Trust Store Type");
-        trustStoreType.setHelpText("A type of trust store (JKS, etc.) By default, JKS is assumed");
+        trustStoreType.setHelpText("A type of trust store (JKS, etc.) By default, 'jks' type is assumed.");
 
         configProperties = asList(mappingMethodList,
                 regExp,
                 userMapperList,
                 attributeOrPropertyValue,
-                checkRevocationMethod,
+                crlCheckingEnabled,
                 crlDPEnabled,
+                cRLRelativePath,
+                oCspCheckingEnabled,
                 ocspResponderUri,
+                keyUsage,
+                extendedKeyUsage,
                 trustStorePath,
                 trustStorePassword,
                 trustStoreType);
@@ -161,7 +177,6 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] getConfigProperties");
         return configProperties;
     }
 
@@ -172,32 +187,24 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
 
     @Override
     public boolean isConfigurable() {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] isConfigurable");
         return true;
     }
 
     @Override
     public boolean isUserSetupAllowed() {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] isUserSetupAllowed");
         return false;
     }
 
     @Override
     public void init(Config.Scope config) {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] init");
-
     }
 
     @Override
     public void postInit(KeycloakSessionFactory factory) {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] postInit");
-
     }
 
     @Override
     public void close() {
-        logger.info("[AbstractX509ClientCertificateAuthenticatorFactory] close");
-
     }
 
 }

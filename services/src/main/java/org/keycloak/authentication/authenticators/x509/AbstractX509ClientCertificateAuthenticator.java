@@ -22,9 +22,6 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.models.*;
 import org.keycloak.services.ServicesLogger;
-
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.Map;
@@ -46,13 +43,12 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
 
     static final String REGULAR_EXPRESSION = "x509-cert-auth.regular-expression";
-    static final String NO_CERT_CHECKING = "No CRL or OCSP Checking";
-    static final String ENABLE_CRL = "CRL/CRLDP";
-    static final String ENABLE_CRLDP = "x509-cert-auth.crldp-enabled";
-    static final String ENABLE_OCSP = "OCSP/OCSP Responder";
+    static final String ENABLE_CRL = "x509-cert-auth.crl-checking-enabled";
+    static final String ENABLE_OCSP = "x509-cert-auth.ocsp-checking-enabled";
+    static final String ENABLE_CRLDP = "x509-cert-auth.crldp-checking-enabled";
+    static final String CRL_RELATIVE_PATH = "x509-cert-auth.crl-relative-path";
     static final String OCSPRESPONDER_URI = "x509-cert-auth.ocsp-responder-uri";
     static final String MAXCERTPATHDEPTH = "x509-cert-auth.maximum-certpath-depth";
-    static final String CERTIFICATE_CHECK_REVOCATION_METHOD = "x509-cert-auth.check-revocation-method";
     static final String MAPPING_SOURCE_SELECTION = "x509-cert-auth.mapping-source-selection";
     static final String MAPPING_SOURCE_CERT_SUBJECTDN = "Certificate SubjectDN";
     static final String MAPPING_SOURCE_CERT_ISSUERDN = "Certificate IssuerDN";
@@ -61,6 +57,8 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     static final String USER_ATTRIBUTE_MAPPER = "Custom Attribute Mapper";
     static final String USERNAME_EMAIL_MAPPER = "Username or Email";
     static final String CUSTOM_ATTRIBUTE_NAME = "x509-cert-auth.mapper-selection.user-attribute-name";
+    static final String CERTIFICATE_KEY_USAGE = "x509-cert-auth.keyusage";
+    static final String CERTIFICATE_EXTENDED_KEY_USAGE = "x509-cert-auth.extendedkeyusage";
     static final String TRUSTSTORE_PATH = "x509-cert-auth.truststore-path";
     static final String TRUSTSTORE_PASSWORD = "x509-cert-auth.truststore-password";
     static final String TRUSTSTORE_TYPE = "x509-cert-auth.truststore-type";
@@ -73,18 +71,29 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
     protected static class CertificateValidatorConfigBuilder {
 
-        static CertificateValidator.CertificateValidatorBuilder fromConfig(Map<String, String> config) throws GeneralSecurityException, IOException {
+        static CertificateValidator.CertificateValidatorBuilder fromConfig(Map<String, String> config) throws Exception {
 
-            CertificateValidator.TrustStoreConfigurationBuilder builder = new CertificateValidator.TrustStoreConfigurationBuilder(firstOrDefault(System.getProperty(JAVAX_NET_SSL_TRUST_STORE),config.get(TRUSTSTORE_PATH)));
+            CertificateValidator.CertificateValidatorBuilder builder = new CertificateValidator.CertificateValidatorBuilder();
             return builder
-                    .withPassword(firstOrDefault(System.getProperty(JAVAX_NET_SSL_TRUST_STORE_PASSWORD),config.get(TRUSTSTORE_PASSWORD)))
-                    .withType(firstOrDefault(System.getProperty(JAVAX_NET_SSL_TRUST_STORE_TYPE),
-                            firstOrDefault(config.get(TRUSTSTORE_TYPE), KeyStore.getDefaultType())))
-                    .build();
+                    .trustStore()
+                        .setPath(firstOrDefault(config.get(TRUSTSTORE_PATH), System.getProperty(JAVAX_NET_SSL_TRUST_STORE)))
+                        .setPassword(firstOrDefault(config.get(TRUSTSTORE_PASSWORD),System.getProperty(JAVAX_NET_SSL_TRUST_STORE_PASSWORD)))
+                        .setType(firstOrDefault(config.get(TRUSTSTORE_TYPE),
+                                firstOrDefault(System.getProperty(JAVAX_NET_SSL_TRUST_STORE_TYPE), KeyStore.getDefaultType())))
+                    .keyUsage()
+                        .parse(config.get(CERTIFICATE_KEY_USAGE))
+                    .extendedKeyUsage()
+                        .parse(config.get(CERTIFICATE_EXTENDED_KEY_USAGE))
+                    .revocation()
+                        .cRLEnabled(config.get(ENABLE_CRL))
+                        .cRLDPEnabled(config.get(ENABLE_CRLDP))
+                        .cRLrelativePath(config.get(CRL_RELATIVE_PATH))
+                        .oCSPEnabled(config.get(ENABLE_OCSP))
+                        .oCSPResponderURI(config.get(OCSPRESPONDER_URI));
         }
     }
 
-    CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(Map<String,String> parameters) throws GeneralSecurityException, IOException {
+    CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(Map<String,String> parameters) throws Exception {
         return X509ClientCertificateAuthenticator.CertificateValidatorConfigBuilder.fromConfig(parameters);
     }
 
@@ -148,7 +157,7 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
         if (certs != null) {
             for (X509Certificate cert : certs) {
-                logger.infof("[X509ClientCertificateAuthenticator:getCertificateChain] \"%s\"", cert.getSubjectDN().getName());
+                logger.debugf("[X509ClientCertificateAuthenticator:getCertificateChain] \"%s\"", cert.getSubjectDN().getName());
             }
         }
 
@@ -157,19 +166,15 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
     @Override
     public boolean requiresUser() {
-        logger.info("[X509ClientCertificateAuthenticator:requiresUser]");
         return false;
     }
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        logger.infof("[X509ClientCertificateAuthenticator:configureFor] user: '%s'", user.getId());
         return true;
     }
 
     @Override
     public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-        logger.infof("[X509ClientCertificateAuthenticator:setRequiredActions] user: '%s'", user.getId());
-
     }
 }
