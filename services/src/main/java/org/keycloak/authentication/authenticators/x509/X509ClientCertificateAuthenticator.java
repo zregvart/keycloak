@@ -19,17 +19,20 @@
 package org.keycloak.authentication.authenticators.x509;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.events.Errors;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.*;
+import org.keycloak.models.utils.FormMessage;
 import org.keycloak.services.ServicesLogger;
 
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,7 +52,6 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
-        logger.info("[X509ClientCertificateAuthenticator:authenticate]");
 
         try {
 
@@ -79,25 +81,30 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             // Validate X509 client certificate
             try {
                 certificateValidationParameters(parameters)
-                        .x509(certs)
-                        .validDates()
-                        .validCertificateChain();
+                        .build(certs)
+                            .validDates()
+                            .validateCertificatePath()
+                            .checkRevocationStatus()
+                            .validateKeyUsage()
+                            .validateExtendedKeyUsage();
             }
             catch(GeneralSecurityException e) {
                 logger.errorf("[X509ClientCertificateAuthenticator:authenticate] Exception: %s", e.getMessage());
                 // TODO use specific locale to load error messages
-                String errorMessage = String.format("Certificate validation's failed. The reason: \"%s\"", e.getMessage());
-                // TODO is this the best to display an error?
-                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                String errorMessage = "Certificate validation's failed.";
+                // TODO is calling form().setErrors enough to show errors on login screen?
+                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                        errorMessage, e.getMessage()));
                 context.attempted();
                 return;
             }
-            catch(IOException e) {
+            catch(Exception e) {
                 logger.errorf("[X509ClientCertificateAuthenticator:authenticate] Exception: %s", e.getMessage());
                 // TODO use specific locale to load error messages
-                String errorMessage = String.format("Certificate validation failed due to an I/O error. The reason: \"%s\"", e.getMessage());
-                // TODO is this the best to display an error?
-                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                String errorMessage = "Certificate validation failed.";
+                // TODO is calling form().setErrors enough to show errors on login screen?
+                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                        errorMessage, e.getMessage()));
                 context.attempted();
                 return;
             }
@@ -107,7 +114,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 logger.warnf("[X509ClientCertificateAuthenticator:authenticate] Unable to extract user identity from certificate.");
                 // TODO use specific locale to load error messages
                 String errorMessage = "Unable to extract user identity from specified certificate";
-                // TODO is this the best to display an error?
+                // TODO is calling form().setErrors enough to show errors on login screen?
                 context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
                 return;
             }
@@ -119,9 +126,10 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             }
             catch(ModelDuplicateException e) {
                 logger.modelDuplicateException(e);
-                String errorMessage = String.format("X509 certificate authentication's failed. Reason: \"%s\"", e.getMessage());
-                // TODO is this the best to display an error?
-                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                String errorMessage = "X509 certificate authentication's failed.";
+                // TODO is calling form().setErrors enough to show errors on login screen?
+                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                        errorMessage, e.getMessage()));
                 context.attempted();
                 return;
             }
@@ -129,9 +137,10 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             if (invalidUser(context, user)) {
                 context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
                 // TODO use specific locale to load error messages
-                String errorMessage = "X509 certificate authentication's failed. Reason: Invalid user";
-                // TODO is this the best to display an error?
-                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),errorMessage));
+                String errorMessage = "X509 certificate authentication's failed.";
+                // TODO is calling form().setErrors enough to show errors on login screen?
+                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                        errorMessage, "Invalid user"));
                 context.attempted();
                 return;
             }
@@ -140,9 +149,10 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 context.getEvent().user(user);
                 context.getEvent().error(Errors.USER_DISABLED);
                 // TODO use specific locale to load error messages
-                String errorMessage = "X509 certificate authentication's failed. Reason: User is disabled";
-                // TODO is this the best to display an error?
-                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                String errorMessage = "X509 certificate authentication's failed.";
+                // TODO is calling form().setErrors enough to show errors on login screen?
+                context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                        errorMessage, "User is disabled"));
                 context.attempted();
                 return;
             }
@@ -151,9 +161,10 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                     context.getEvent().user(user);
                     context.getEvent().error(Errors.USER_TEMPORARILY_DISABLED);
                     // TODO use specific locale to load error messages
-                    String errorMessage = "X509 certificate authentication's failed. Reason: User is temporarily disabled. Contact administrator";
-                    // TODO is this the best to display an error?
-                    context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                    String errorMessage = "X509 certificate authentication's failed.";
+                    // TODO is calling form().setErrors enough to show errors on login screen?
+                    context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
+                            errorMessage, "User is temporarily disabled. Contact administrator."));
                     context.attempted();
                     return;
                 }
@@ -165,6 +176,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             // to call the method "challenge" results in a wrong/unexpected behavior.
             // The question is whether calling "forceChallenge" here is ok from
             // the design viewpoint?
+            context.getClientSession().setNote(AuthenticationProcessor.CURRENT_AUTHENTICATION_EXECUTION, context.getExecution().getId());
             context.forceChallenge(createSuccessResponse(context, certs[0].getSubjectDN().getName()));
             // Do not set the flow status yet, we want to display a form to let users
             // choose whether to accept the identity from certificate or to specify username/password explicitly
@@ -178,29 +190,39 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
 
     private Response createErrorResponse(AuthenticationFlowContext context,
                                          String subjectDN,
-                                         String errorMessage) {
+                                         String errorMessage,
+                                         String ... errorParameters) {
 
-        return createResponse(context, subjectDN, false, errorMessage);
+        return createResponse(context, subjectDN, false, errorMessage, errorParameters);
     }
 
     private Response createSuccessResponse(AuthenticationFlowContext context,
                                            String subjectDN) {
-        return createResponse(context, subjectDN, true, null);
+        return createResponse(context, subjectDN, true, null, null);
     }
 
     private Response createResponse(AuthenticationFlowContext context,
                                          String subjectDN,
                                          boolean isUserEnabled,
-                                         String errorMessage) {
+                                         String errorMessage,
+                                         Object[] errorParameters) {
 
         LoginFormsProvider form = context.form();
         if (errorMessage != null && errorMessage.trim().length() > 0) {
-            form.setError(errorMessage);
-        }
+            List<FormMessage> errors = new LinkedList<>();
 
-        // FIXME BAD! Do not use absolute path to the javascript resource that includes keycloak's current build number.
-        // What is the right way to add and reference javscript resources?
-        form.addScript("/auth/resources/2.1.0-snapshot/login/keycloak/scripts/timedLogin.js");
+            errors.add(new FormMessage(errorMessage));
+            if (errorParameters != null) {
+
+                for (Object errorParameter : errorParameters) {
+                    if (errorParameter == null) continue;
+                    for (String part : errorParameter.toString().split("\n")) {
+                        errors.add(new FormMessage(part));
+                    }
+                }
+            }
+            form.setErrors(errors);
+        }
 
         return form
                 .setAttribute("username", context.getUser() != null ? context.getUser().getUsername() : "unknown user")
@@ -214,7 +236,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
         Enumeration<String> attributeNames = context.getHttpRequest().getAttributeNames();
         while(attributeNames.hasMoreElements()) {
             String a = attributeNames.nextElement();
-            logger.infof("[X509ClientCertificateAuthenticator:dumpContainerAttributes] \"%s\"", a);
+            logger.debugf("[X509ClientCertificateAuthenticator:dumpContainerAttributes] \"%s\"", a);
         }
     }
 
@@ -237,7 +259,6 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
 
     @Override
     public void action(AuthenticationFlowContext context) {
-        logger.info("[X509ClientCertificateAuthenticator:action]");
         MultivaluedMap<String, String> formData = context.getHttpRequest().getDecodedFormParameters();
         if (formData.containsKey("cancel")) {
             context.clearUser();

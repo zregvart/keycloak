@@ -20,6 +20,8 @@ package org.keycloak.authentication.authenticators.x509;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
+import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
+import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.ModelDuplicateException;
@@ -70,9 +72,12 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         // Validate X509 client certificate
         try {
             certificateValidationParameters(parameters)
-                    .x509(certs)
-                    .validDates()
-                    .validCertificateChain();
+                    .build(certs)
+                        .validDates()
+                        .validateCertificatePath()
+                        .checkRevocationStatus()
+                        .validateKeyUsage()
+                        .validateExtendedKeyUsage();
         }
         catch(GeneralSecurityException e) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Exception: %s", e.getMessage());
@@ -82,10 +87,10 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
             return;
         }
-        catch(IOException e) {
+        catch(Exception e) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Exception: %s", e.getMessage());
             // TODO use specific locale to load error messages
-            String errorMessage = String.format("Certificate validation failed due to an I/O error. The reason: \"%s\"", e.getMessage());
+            String errorMessage = String.format("Certificate validation failed. The reason: \"%s\"", e.getMessage());
             Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", errorMessage);
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
             return;
@@ -93,7 +98,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
 
         Object userIdentity = UserIdentityExtractorBuilder.fromConfig(parameters).extractUserIdentity(certs);
         if (userIdentity == null) {
-            logger.warnf("[ValidateX509CertificateUsername:authenticate] Unable to extract user identity from certificate.");
+            logger.errorf("[ValidateX509CertificateUsername:authenticate] Unable to extract user identity from certificate.");
             // TODO use specific locale to load error messages
             String errorMessage = "Unable to extract user identity from specified certificate";
             Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", errorMessage);
@@ -102,6 +107,8 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         }
         UserModel user;
         try {
+            context.getEvent().detail(Details.USERNAME, userIdentity.toString());
+            context.getClientSession().setNote(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME, userIdentity.toString());
             user = UserIdentityToModelMapperBuilder.fromConfig(parameters)
                     .find(context, userIdentity);
         }

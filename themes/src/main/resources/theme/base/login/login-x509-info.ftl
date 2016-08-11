@@ -5,6 +5,7 @@
     <#elseif section = "header">
         ${msg("loginTitleHtml",(realm.displayNameHtml!''))}
     <#elseif section = "form">
+
         <form id="kc-x509-login-info" class="${properties.kcFormClass!}" action="${url.loginAction}" method="post">
             <div class="${properties.kcFormGroupClass!}">
 
@@ -49,7 +50,29 @@
                         </#if>
                     </div>
                 </div>
+		<span id="counter">The form will be submitted in -- seconds</span>
             </div>
         </form>
+<script>
+
+var n = 10;
+function autoSubmitCountdown(){
+    var c=n;
+    setInterval(function(){
+        if(c>=0){
+    	     document.getElementById("counter").textContent = "The form will be submitted in " + c + " seconds";
+        }
+        if(c==0){
+	    document.forms[0].submit();
+        }
+        c--;
+    },1000);
+}
+
+// Start
+autoSubmitCountdown();
+
+</script>
     </#if>
+
 </@layout.registrationLayout>
