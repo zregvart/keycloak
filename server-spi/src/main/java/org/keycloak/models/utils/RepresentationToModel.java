@@ -20,7 +20,9 @@ package org.keycloak.models.utils;
 import org.keycloak.authorization.AuthorizationProvider;
 import org.keycloak.authorization.model.ResourceServer;
 import org.keycloak.authorization.store.ResourceServerStore;
+import org.keycloak.component.ComponentModel;
 import org.keycloak.hash.Pbkdf2PasswordHashProvider;
+import org.keycloak.migration.migrators.MigrationUtils;
 import org.keycloak.models.ClientTemplateModel;
 import org.keycloak.models.Constants;
 import org.keycloak.common.util.Base64;
@@ -61,6 +63,7 @@ import org.keycloak.representations.idm.AuthenticatorConfigRepresentation;
 import org.keycloak.representations.idm.ClaimRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientTemplateRepresentation;
+import org.keycloak.representations.idm.ComponentRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.FederatedIdentityRepresentation;
 import org.keycloak.representations.idm.GroupRepresentation;
@@ -196,7 +199,7 @@ public class RepresentationToModel {
             newRealm.addRequiredCredential(CredentialRepresentation.PASSWORD);
         }
 
-        if (rep.getPasswordPolicy() != null) newRealm.setPasswordPolicy(new PasswordPolicy(rep.getPasswordPolicy()));
+        if (rep.getPasswordPolicy() != null) newRealm.setPasswordPolicy(PasswordPolicy.parse(session, rep.getPasswordPolicy()));
         if (rep.getOtpPolicyType() != null) newRealm.setOTPPolicy(toPolicy(rep));
         else newRealm.setOTPPolicy(OTPPolicy.DEFAULT_POLICY);
 
@@ -204,6 +207,9 @@ public class RepresentationToModel {
         if (rep.getRequiredActions() != null) {
             for (RequiredActionProviderRepresentation action : rep.getRequiredActions()) {
                 RequiredActionProviderModel model = toModel(action);
+
+                MigrationUtils.updateOTPRequiredAction(model);
+
                 newRealm.addRequiredActionProvider(model);
             }
         } else {
@@ -661,7 +667,7 @@ public class RepresentationToModel {
         return url != null ? url.replace(target, replacement) : null;
     }
 
-    public static void updateRealm(RealmRepresentation rep, RealmModel realm) {
+    public static void updateRealm(RealmRepresentation rep, RealmModel realm, KeycloakSession session) {
         if (rep.getRealm() != null) {
             renameRealm(realm, rep.getRealm());
         }
@@ -709,7 +715,7 @@ public class RepresentationToModel {
         if (rep.isAdminEventsDetailsEnabled() != null) realm.setAdminEventsDetailsEnabled(rep.isAdminEventsDetailsEnabled());
 
 
-        if (rep.getPasswordPolicy() != null) realm.setPasswordPolicy(new PasswordPolicy(rep.getPasswordPolicy()));
+        if (rep.getPasswordPolicy() != null) realm.setPasswordPolicy(PasswordPolicy.parse(session, rep.getPasswordPolicy()));
         if (rep.getOtpPolicyType() != null) realm.setOTPPolicy(toPolicy(rep));
 
         if (rep.getDefaultRoles() != null) {
@@ -1614,4 +1620,13 @@ public class RepresentationToModel {
     }
 
 
+    public static ComponentModel toModel(ComponentRepresentation rep) {
+        ComponentModel model = new ComponentModel();
+        model.setParentId(rep.getParentId());
+        model.setProviderType(rep.getProviderType());
+        model.setProviderId(rep.getProviderId());
+        model.setConfig(rep.getConfig());
+        model.setName(rep.getName());
+        return model;
+    }
 }

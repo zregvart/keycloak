@@ -25,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.WebApplicationException;
@@ -33,8 +32,14 @@ import javax.ws.rs.core.Context;
 
 import org.keycloak.broker.provider.IdentityProvider;
 import org.keycloak.broker.provider.IdentityProviderFactory;
+import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.events.EventType;
 import org.keycloak.events.admin.OperationType;
+import org.keycloak.policy.PasswordPolicyProvider;
+import org.keycloak.policy.PasswordPolicyProviderFactory;
+import org.keycloak.provider.*;
+import org.keycloak.representations.idm.ComponentTypeRepresentation;
+import org.keycloak.representations.idm.PasswordPolicyTypeRepresentation;
 import org.keycloak.theme.Theme;
 import org.keycloak.theme.ThemeProvider;
 import org.keycloak.models.KeycloakSession;
@@ -44,10 +49,6 @@ import org.keycloak.protocol.ClientInstallationProvider;
 import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.LoginProtocolFactory;
 import org.keycloak.protocol.ProtocolMapper;
-import org.keycloak.provider.ProviderConfigProperty;
-import org.keycloak.provider.ProviderFactory;
-import org.keycloak.provider.ServerInfoAwareProviderFactory;
-import org.keycloak.provider.Spi;
 import org.keycloak.representations.idm.ConfigPropertyRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperTypeRepresentation;
@@ -88,6 +89,7 @@ public class ServerInfoAdminResource {
         setProtocolMapperTypes(info);
         setBuiltinProtocolMappers(info);
         setClientInstallations(info);
+        setPasswordPolicies(info);
         info.setEnums(ENUMS);
         return info;
     }
@@ -113,11 +115,27 @@ public class ServerInfoAdminResource {
             Map<String, ProviderRepresentation> providers = new HashMap<>();
 
             if (providerIds != null) {
+                info.setComponentTypes(new HashMap<>());
                 for (String name : providerIds) {
                     ProviderRepresentation provider = new ProviderRepresentation();
                     ProviderFactory<?> pi = session.getKeycloakSessionFactory().getProviderFactory(spi.getProviderClass(), name);
                     if (ServerInfoAwareProviderFactory.class.isAssignableFrom(pi.getClass())) {
                         provider.setOperationalInfo(((ServerInfoAwareProviderFactory) pi).getOperationalInfo());
+                    }
+                    if (pi instanceof ConfiguredProvider) {
+                        ComponentTypeRepresentation rep = new ComponentTypeRepresentation();
+                        rep.setId(pi.getId());
+                        ConfiguredProvider configured = (ConfiguredProvider)pi;
+                        rep.setHelpText(configured.getHelpText());
+                        List<ProviderConfigProperty> configProperties = configured.getConfigProperties();
+                        if (configProperties == null) configProperties = Collections.EMPTY_LIST;
+                        rep.setProperties(ModelToRepresentation.toRepresentation(configProperties));
+                        List<ComponentTypeRepresentation> reps = info.getComponentTypes().get(spi.getProviderClass().getName());
+                        if (reps == null) {
+                            reps = new LinkedList<>();
+                            info.getComponentTypes().put(spi.getProviderClass().getName(), reps);
+                        }
+                        reps.add(rep);
                     }
                     providers.put(name, provider);
                 }
@@ -223,15 +241,7 @@ public class ServerInfoAdminResource {
             rep.setCategory(mapper.getDisplayCategory());
             rep.setProperties(new LinkedList<ConfigPropertyRepresentation>());
             List<ProviderConfigProperty> configProperties = mapper.getConfigProperties();
-            for (ProviderConfigProperty prop : configProperties) {
-                ConfigPropertyRepresentation propRep = new ConfigPropertyRepresentation();
-                propRep.setName(prop.getName());
-                propRep.setLabel(prop.getLabel());
-                propRep.setType(prop.getType());
-                propRep.setDefaultValue(prop.getDefaultValue());
-                propRep.setHelpText(prop.getHelpText());
-                rep.getProperties().add(propRep);
-            }
+            rep.setProperties(ModelToRepresentation.toRepresentation(configProperties));
             types.add(rep);
         }
     }
@@ -245,6 +255,20 @@ public class ServerInfoAdminResource {
                 mappers.add(ModelToRepresentation.toRepresentation(mapper));
             }
             info.getBuiltinProtocolMappers().put(p.getId(), mappers);
+        }
+    }
+
+    private void setPasswordPolicies(ServerInfoRepresentation info) {
+        info.setPasswordPolicies(new LinkedList<>());
+        for (ProviderFactory f : session.getKeycloakSessionFactory().getProviderFactories(PasswordPolicyProvider.class)) {
+            PasswordPolicyProviderFactory factory = (PasswordPolicyProviderFactory) f;
+            PasswordPolicyTypeRepresentation rep = new PasswordPolicyTypeRepresentation();
+            rep.setId(factory.getId());
+            rep.setDisplayName(factory.getDisplayName());
+            rep.setConfigType(factory.getConfigType());
+            rep.setDefaultValue(factory.getDefaultConfigValue());
+            rep.setMultipleSupported(factory.isMultiplSupported());
+            info.getPasswordPolicies().add(rep);
         }
     }
 

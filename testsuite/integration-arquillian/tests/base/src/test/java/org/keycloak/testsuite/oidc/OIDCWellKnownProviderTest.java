@@ -95,6 +95,13 @@ public class OIDCWellKnownProviderTest extends AbstractKeycloakTest {
             assertContains(oidcConfig.getClaimsSupported(), IDToken.NAME, IDToken.EMAIL, IDToken.PREFERRED_USERNAME, IDToken.FAMILY_NAME);
             Assert.assertNames(oidcConfig.getClaimTypesSupported(), "normal");
             Assert.assertFalse(oidcConfig.getClaimsParameterSupported());
+
+            // Scopes supported
+            Assert.assertNames(oidcConfig.getScopesSupported(), OAuth2Constants.SCOPE_OPENID, OAuth2Constants.OFFLINE_ACCESS);
+
+            // Request and Request_Uri
+            Assert.assertFalse(oidcConfig.getRequestParameterSupported());
+            Assert.assertFalse(oidcConfig.getRequestUriParameterSupported());
         } finally {
             client.close();
         }

@@ -137,6 +137,10 @@ public class JpaRealmProvider implements RealmProvider {
                 .setParameter("realm", realm).executeUpdate();
         num = em.createNamedQuery("deleteGroupsByRealm")
                 .setParameter("realm", realm).executeUpdate();
+        num = em.createNamedQuery("deleteComponentConfigByRealm")
+                .setParameter("realm", realm).executeUpdate();
+        num = em.createNamedQuery("deleteComponentByRealm")
+                .setParameter("realm", realm).executeUpdate();
 
         TypedQuery<String> query = em.createNamedQuery("getClientIdsByRealm", String.class);
         query.setParameter("realm", realm.getId());
@@ -152,6 +156,7 @@ public class JpaRealmProvider implements RealmProvider {
         for (RoleModel role : adapter.getRoles()) {
             session.realms().removeRole(adapter, role);
         }
+
 
         em.remove(realm);
 

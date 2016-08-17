@@ -17,6 +17,7 @@
 package org.keycloak.storage.jpa;
 
 import org.keycloak.common.util.MultivaluedHashMap;
+import org.keycloak.component.ComponentModel;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.GroupModel;
@@ -31,11 +32,10 @@ import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.models.jpa.entities.CredentialEntity;
 import org.keycloak.models.utils.FederatedCredentials;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.storage.StorageId;
-import org.keycloak.storage.StorageProviderModel;
+import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.federated.UserAttributeFederatedStorage;
 import org.keycloak.storage.federated.UserBrokerLinkFederatedStorage;
 import org.keycloak.storage.federated.UserConsentFederatedStorage;
@@ -145,6 +145,15 @@ public class JpaUserFederatedStorageProvider implements
 
         }
         return result;
+    }
+
+    @Override
+    public List<String> getUsersByUserAttribute(RealmModel realm, String name, String value) {
+        TypedQuery<String> query = em.createNamedQuery("getFederatedAttributesByNameAndValue", String.class)
+                .setParameter("realmId", realm.getId())
+                .setParameter("name", name)
+                .setParameter("value", value);
+        return query.getResultList();
     }
 
     @Override
@@ -508,6 +517,15 @@ public class JpaUserFederatedStorageProvider implements
 
     }
 
+    @Override
+    public List<String> getMembership(RealmModel realm, GroupModel group, int firstResult, int max) {
+        TypedQuery<String> query = em.createNamedQuery("fedgroupMembership", String.class)
+                .setParameter("realmId", realm.getId())
+                .setParameter("groupId", group.getId());
+        query.setFirstResult(firstResult);
+        query.setMaxResults(max);
+        return query.getResultList();
+    }
 
     @Override
     public Set<String> getRequiredActions(RealmModel realm, UserModel user) {
@@ -689,7 +707,7 @@ public class JpaUserFederatedStorageProvider implements
                 .setParameter("userId", user.getId())
                 .setParameter("realmId", realm.getId())
                 .executeUpdate();
-        em.createNamedQuery("getFederatedUserRequiredActionsByUser")
+        em.createNamedQuery("deleteFederatedUserRequiredActionsByUser")
                 .setParameter("userId", user.getId())
                 .setParameter("realmId", realm.getId())
                 .executeUpdate();
@@ -701,7 +719,9 @@ public class JpaUserFederatedStorageProvider implements
     }
 
     @Override
-    public void preRemove(RealmModel realm, StorageProviderModel model) {
+    public void preRemove(RealmModel realm, ComponentModel model) {
+        if (!model.getProviderType().equals(UserStorageProvider.class.getName())) return;
+
         em.createNamedQuery("deleteBrokerLinkByStorageProvider")
                 .setParameter("storageProviderId", model.getId())
                 .executeUpdate();

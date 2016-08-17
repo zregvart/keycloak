@@ -31,12 +31,20 @@ import org.keycloak.authorization.permission.ResourcePermission;
 import org.keycloak.authorization.policy.evaluation.DecisionResultCollector;
 import org.keycloak.authorization.policy.evaluation.EvaluationContext;
 import org.keycloak.authorization.policy.evaluation.Result;
+import org.keycloak.authorization.store.ScopeStore;
 import org.keycloak.authorization.store.StoreFactory;
 import org.keycloak.authorization.util.Permissions;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientSessionModel;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.models.ProtocolMapperModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.models.UserSessionModel;
+import org.keycloak.protocol.ProtocolMapper;
+import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.services.Urls;
 
@@ -80,16 +88,17 @@ public class PolicyEvaluationService {
     @Consumes("application/json")
     @Produces("application/json")
     public void evaluate(PolicyEvaluationRequest evaluationRequest, @Suspended AsyncResponse asyncResponse) {
-        EvaluationContext evaluationContext = createEvaluationContext(evaluationRequest);
-        authorization.evaluators().from(createPermissions(evaluationRequest, evaluationContext, authorization), evaluationContext).evaluate(createDecisionCollector(evaluationRequest, authorization, asyncResponse));
+        KeycloakIdentity identity = createIdentity(evaluationRequest);
+        EvaluationContext evaluationContext = createEvaluationContext(evaluationRequest, identity);
+        authorization.evaluators().from(createPermissions(evaluationRequest, evaluationContext, authorization), evaluationContext).evaluate(createDecisionCollector(evaluationRequest, authorization, identity, asyncResponse));
     }
 
-    private DecisionResultCollector createDecisionCollector(PolicyEvaluationRequest evaluationRequest, AuthorizationProvider authorization, AsyncResponse asyncResponse) {
+    private DecisionResultCollector createDecisionCollector(PolicyEvaluationRequest evaluationRequest, AuthorizationProvider authorization, KeycloakIdentity identity, AsyncResponse asyncResponse) {
         return new DecisionResultCollector() {
             @Override
             protected void onComplete(List<Result> results) {
                 try {
-                    asyncResponse.resume(Response.ok(PolicyEvaluationResponse.build(evaluationRequest,  results, resourceServer,  authorization)).build());
+                    asyncResponse.resume(Response.ok(PolicyEvaluationResponse.build(evaluationRequest,  results, resourceServer,  authorization, identity)).build());
                 } catch (Throwable cause) {
                     asyncResponse.resume(cause);
                 }
@@ -102,8 +111,8 @@ public class PolicyEvaluationService {
         };
     }
 
-    private EvaluationContext createEvaluationContext(PolicyEvaluationRequest representation) {
-        return new KeycloakEvaluationContext(createIdentity(representation), this.authorization.getKeycloakSession()) {
+    private EvaluationContext createEvaluationContext(PolicyEvaluationRequest representation, KeycloakIdentity identity) {
+        return new KeycloakEvaluationContext(identity, this.authorization.getKeycloakSession()) {
             @Override
             public Attributes getAttributes() {
                 Map<String, Collection<String>> attributes = new HashMap<>(super.getAttributes().toMap());
@@ -129,11 +138,8 @@ public class PolicyEvaluationService {
     }
 
     private List<ResourcePermission> createPermissions(PolicyEvaluationRequest representation, EvaluationContext evaluationContext, AuthorizationProvider authorization) {
-        if (representation.isEntitlements()) {
-            return Permissions.all(this.resourceServer, evaluationContext.getIdentity(), authorization);
-        }
-
-        return representation.getResources().stream().flatMap((Function<PolicyEvaluationRequest.Resource, Stream<ResourcePermission>>) resource -> {
+        List<PolicyEvaluationRequest.Resource> resources = representation.getResources();
+        return resources.stream().flatMap((Function<PolicyEvaluationRequest.Resource, Stream<ResourcePermission>>) resource -> {
             Set<String> givenScopes = resource.getScopes();
 
             if (givenScopes == null) {
@@ -142,29 +148,42 @@ public class PolicyEvaluationService {
 
             StoreFactory storeFactory = authorization.getStoreFactory();
 
-            List<Scope> scopes = givenScopes.stream().map(scopeName -> storeFactory.getScopeStore().findByName(scopeName, this.resourceServer.getId())).collect(Collectors.toList());
-
             if (resource.getId() != null) {
                 Resource resourceModel = storeFactory.getResourceStore().findById(resource.getId());
-                return Stream.of(new ResourcePermission(resourceModel, scopes, resourceServer));
+                return Permissions.createResourcePermissions(resourceModel, givenScopes, authorization).stream();
             } else if (resource.getType() != null) {
-                return storeFactory.getResourceStore().findByType(resource.getType()).stream().map(resource1 -> new ResourcePermission(resource1, scopes, resourceServer));
+                Set<String> finalGivenScopes = givenScopes;
+                return storeFactory.getResourceStore().findByType(resource.getType()).stream().flatMap(resource1 -> Permissions.createResourcePermissions(resource1, finalGivenScopes, authorization).stream());
             } else {
-                return scopes.stream().map(scope -> new ResourcePermission(null, asList(scope), resourceServer));
+                ScopeStore scopeStore = storeFactory.getScopeStore();
+                List<Scope> scopes = givenScopes.stream().map(scopeName -> scopeStore.findByName(scopeName, this.resourceServer.getId())).collect(Collectors.toList());
+                List<ResourcePermission> collect = scopes.stream().map(scope -> new ResourcePermission(null, asList(scope), resourceServer)).collect(Collectors.toList());
+
+                if (scopes.isEmpty()) {
+                    scopes = scopeStore.findByResourceServer(resourceServer.getId());
+                }
+
+                for (Scope scope : scopes) {
+                    collect.addAll(storeFactory.getResourceStore().findByScope(scope.getId()).stream().map(resource12 -> new ResourcePermission(resource12, asList(scope), resourceServer)).collect(Collectors.toList()));
+                }
+
+                return collect.stream();
             }
         }).collect(Collectors.toList());
     }
 
     private KeycloakIdentity createIdentity(PolicyEvaluationRequest representation) {
-        RealmModel realm = this.authorization.getKeycloakSession().getContext().getRealm();
+        KeycloakSession keycloakSession = this.authorization.getKeycloakSession();
+        RealmModel realm = keycloakSession.getContext().getRealm();
         AccessToken accessToken = new AccessToken();
 
         accessToken.subject(representation.getUserId());
         accessToken.issuedFor(representation.getClientId());
         accessToken.audience(representation.getClientId());
-        accessToken.issuer(Urls.realmIssuer(this.authorization.getKeycloakSession().getContext().getUri().getBaseUri(), realm.getName()));
+        accessToken.issuer(Urls.realmIssuer(keycloakSession.getContext().getUri().getBaseUri(), realm.getName()));
         accessToken.setRealmAccess(new AccessToken.Access());
 
+        AccessToken.Access realmAccess = accessToken.getRealmAccess();
         Map<String, Object> claims = accessToken.getOtherClaims();
         Map<String, String> givenAttributes = representation.getContext().get("attributes");
 
@@ -175,31 +194,66 @@ public class PolicyEvaluationService {
         String subject = accessToken.getSubject();
 
         if (subject != null) {
-            UserModel userModel = this.authorization.getKeycloakSession().users().getUserById(subject, realm);
+            UserModel userModel = keycloakSession.users().getUserById(subject, realm);
 
             if (userModel != null) {
-                Set<RoleModel> roleMappings = userModel.getRoleMappings();
+                userModel.getAttributes().forEach(claims::put);
 
-                roleMappings.stream().map(RoleModel::getName).forEach(roleName -> accessToken.getRealmAccess().addRole(roleName));
+                userModel.getRoleMappings().stream().map(RoleModel::getName).forEach(roleName -> realmAccess.addRole(roleName));
 
                 String clientId = representation.getClientId();
 
+                if (clientId == null) {
+                    clientId = resourceServer.getClientId();
+                }
+
                 if (clientId != null) {
                     ClientModel clientModel = realm.getClientById(clientId);
+                    ClientSessionModel clientSession = null;
+                    UserSessionModel userSession = null;
+                    try {
+                        clientSession = keycloakSession.sessions().createClientSession(realm, clientModel);
+                        userSession = keycloakSession.sessions().createUserSession(realm, userModel, userModel.getUsername(), "127.0.0.1", "passwd", false, null, null);
 
-                    accessToken.addAccess(clientModel.getClientId());
+                        UserSessionModel finalUserSession = userSession;
+                        ClientSessionModel finalClientSession = clientSession;
 
-                    userModel.getClientRoleMappings(clientModel).stream().map(RoleModel::getName).forEach(roleName -> accessToken.getResourceAccess(clientModel.getClientId()).addRole(roleName));
+                        for (ProtocolMapperModel mapping : clientModel.getProtocolMappers()) {
+                            KeycloakSessionFactory sessionFactory = keycloakSession.getKeycloakSessionFactory();
+                            ProtocolMapper mapper = (ProtocolMapper)sessionFactory.getProviderFactory(ProtocolMapper.class, mapping.getProtocolMapper());
 
-                    //TODO: would be awesome if we could transform the access token using the configured protocol mappers. Tried, but without a clientSession and userSession is tuff.
+                            if (mapper != null && (mapper instanceof OIDCAccessTokenMapper)) {
+                                accessToken = ((OIDCAccessTokenMapper)mapper).transformAccessToken(accessToken, mapping, keycloakSession, finalUserSession, finalClientSession);
+                            }
+                        }
+                    } finally {
+                        if (clientSession != null) {
+                            keycloakSession.sessions().removeClientSession(realm, clientSession);
+                        }
+
+                        if (userSession != null) {
+                            keycloakSession.sessions().removeUserSession(realm, userSession);
+                        }
+                    }
+
+                    AccessToken.Access clientAccess = accessToken.addAccess(clientModel.getClientId());
+                    clientAccess.roles(new HashSet<>());
+
+                    userModel.getClientRoleMappings(clientModel).stream().map(RoleModel::getName).forEach(roleName -> clientAccess.addRole(roleName));
+
+                    ClientModel resourceServerClient = realm.getClientById(resourceServer.getClientId());
+                    AccessToken.Access resourceServerAccess = accessToken.addAccess(resourceServerClient.getClientId());
+                    resourceServerAccess.roles(new HashSet<>());
+
+                    userModel.getClientRoleMappings(resourceServerClient).stream().map(RoleModel::getName).forEach(roleName -> resourceServerAccess.addRole(roleName));
                 }
             }
         }
 
         if (representation.getRoleIds() != null) {
-            representation.getRoleIds().forEach(roleName -> accessToken.getRealmAccess().addRole(roleName));
+            representation.getRoleIds().forEach(roleName -> realmAccess.addRole(roleName));
         }
 
-        return new KeycloakIdentity(accessToken, this.authorization.getKeycloakSession());
+        return new KeycloakIdentity(accessToken, keycloakSession);
     }
 }

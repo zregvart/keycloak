@@ -42,6 +42,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
@@ -153,7 +154,11 @@ public class PolicyService {
         }
 
         policyStore.findDependentPolicies(id).forEach(dependentPolicy -> {
-            dependentPolicy.removeAssociatedPolicy(policy);
+            if (dependentPolicy.getAssociatedPolicies().size() == 1) {
+                policyStore.delete(dependentPolicy.getId());
+            } else {
+                dependentPolicy.removeAssociatedPolicy(policy);
+            }
         });
 
         policyStore.delete(policy.getId());
@@ -172,6 +177,27 @@ public class PolicyService {
 
         if (model == null) {
             return Response.status(Status.NOT_FOUND).build();
+        }
+
+        return Response.ok(toRepresentation(model, authorization)).build();
+    }
+
+    @Path("/search")
+    @GET
+    @Produces("application/json")
+    @NoCache
+    public Response find(@QueryParam("name") String name) {
+        this.auth.requireView();
+        StoreFactory storeFactory = authorization.getStoreFactory();
+
+        if (name == null) {
+            return Response.status(Status.BAD_REQUEST).build();
+        }
+
+        Policy model = storeFactory.getPolicyStore().findByName(name, this.resourceServer.getId());
+
+        if (model == null) {
+            return Response.status(Status.OK).build();
         }
 
         return Response.ok(toRepresentation(model, authorization)).build();
@@ -249,7 +275,6 @@ public class PolicyService {
             }
 
             StoreFactory storeFactory = authorization.getStoreFactory();
-            PolicyStore policyStore = storeFactory.getPolicyStore();
 
             for (String scopeId : scopeIds) {
                 boolean hasScope = false;

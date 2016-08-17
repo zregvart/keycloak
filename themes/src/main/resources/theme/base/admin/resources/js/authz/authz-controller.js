@@ -107,6 +107,8 @@ module.controller('ResourceServerResourceDetailCtrl', function($scope, $http, $r
         $scope.scopes = data;
     });
 
+    var $instance = this;
+
     ResourceServer.get({
         realm : $route.current.params.realm,
         client : client.id
@@ -131,9 +133,11 @@ module.controller('ResourceServerResourceDetailCtrl', function($scope, $http, $r
             }, true);
 
             $scope.save = function() {
-                ResourceServerResource.save({realm : realm.realm, client : $scope.client.id}, $scope.resource, function(data) {
-                    $location.url("/realms/" + realm.realm + "/clients/" + $scope.client.id + "/authz/resource-server/resource/" + data._id);
-                    Notifications.success("The resource has been created.");
+                $instance.checkNameAvailability(function () {
+                    ResourceServerResource.save({realm : realm.realm, client : $scope.client.id}, $scope.resource, function(data) {
+                        $location.url("/realms/" + realm.realm + "/clients/" + $scope.client.id + "/authz/resource-server/resource/" + data._id);
+                        Notifications.success("The resource has been created.");
+                    });
                 });
             }
 
@@ -146,12 +150,22 @@ module.controller('ResourceServerResourceDetailCtrl', function($scope, $http, $r
                 client : client.id,
                 rsrid : $route.current.params.rsrid,
             }, function(data) {
+                if (!data.scopes) {
+                    data.scopes = [];
+                }
+
+                if (!data.policies) {
+                    data.policies = [];
+                }
+
                 $scope.resource = angular.copy(data);
                 $scope.changed = false;
 
                 for (i = 0; i < $scope.resource.scopes.length; i++) {
                     $scope.resource.scopes[i] = $scope.resource.scopes[i].name;
                 }
+
+                $scope.originalResource = angular.copy($scope.resource);
 
                 $scope.$watch('resource', function() {
                     if (!angular.equals($scope.resource, data)) {
@@ -160,9 +174,11 @@ module.controller('ResourceServerResourceDetailCtrl', function($scope, $http, $r
                 }, true);
 
                 $scope.save = function() {
-                    ResourceServerResource.update({realm : realm.realm, client : $scope.client.id, rsrid : $scope.resource._id}, $scope.resource, function() {
-                        $route.reload();
-                        Notifications.success("The resource has been updated.");
+                    $instance.checkNameAvailability(function () {
+                        ResourceServerResource.update({realm : realm.realm, client : $scope.client.id, rsrid : $scope.resource._id}, $scope.resource, function() {
+                            $route.reload();
+                            Notifications.success("The resource has been updated.");
+                        });
                     });
                 }
 
@@ -188,12 +204,30 @@ module.controller('ResourceServerResourceDetailCtrl', function($scope, $http, $r
                 }
 
                 $scope.reset = function() {
-                    $scope.resource = angular.copy(data);
-                    $scope.changed = false;
+                    $route.reload();
                 }
             });
         }
     });
+
+    $scope.checkNewNameAvailability = function () {
+        $instance.checkNameAvailability(function () {});
+    }
+
+    this.checkNameAvailability = function (onSuccess) {
+        ResourceServerResource.search({
+            realm : $route.current.params.realm,
+            client : client.id,
+            rsrid : $route.current.params.rsrid,
+            name: $scope.resource.name
+        }, function(data) {
+            if (data && data._id && data._id != $scope.resource._id) {
+                Notifications.error("Name already in use by another resource, please choose another one.");
+            } else {
+                onSuccess();
+            }
+        });
+    }
 });
 
 module.controller('ResourceServerScopeCtrl', function($scope, $http, $route, $location, realm, ResourceServer, ResourceServerScope, client) {
@@ -209,12 +243,18 @@ module.controller('ResourceServerScopeCtrl', function($scope, $http, $route, $lo
         ResourceServerScope.query({realm : realm.realm, client : client.id}, function (data) {
             $scope.scopes = data;
         });
+
+        $scope.createPolicy = function(scope) {
+            $location.path('/realms/' + $route.current.params.realm + '/clients/' + client.id + '/authz/resource-server/permission/scope/create').search({scpid: scope.id});
+        }
     });
 });
 
 module.controller('ResourceServerScopeDetailCtrl', function($scope, $http, $route, $location, realm, ResourceServer, client, ResourceServerScope, AuthzDialog, Notifications) {
     $scope.realm = realm;
     $scope.client = client;
+
+    var $instance = this;
 
     ResourceServer.get({
         realm : $route.current.params.realm,
@@ -230,7 +270,7 @@ module.controller('ResourceServerScopeDetailCtrl', function($scope, $http, $rout
 
             var scope = {};
 
-            $scope.resource = angular.copy(scope);
+            $scope.scope = angular.copy(scope);
 
             $scope.$watch('scope', function() {
                 if (!angular.equals($scope.scope, scope)) {
@@ -239,9 +279,11 @@ module.controller('ResourceServerScopeDetailCtrl', function($scope, $http, $rout
             }, true);
 
             $scope.save = function() {
-                ResourceServerScope.save({realm : realm.realm, client : $scope.client.id}, $scope.scope, function(data) {
-                    $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/scope/" + data.id);
-                    Notifications.success("The scope has been created.");
+                $instance.checkNameAvailability(function () {
+                    ResourceServerScope.save({realm : realm.realm, client : $scope.client.id}, $scope.scope, function(data) {
+                        $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/scope/" + data.id);
+                        Notifications.success("The scope has been created.");
+                    });
                 });
             }
         } else {
@@ -259,10 +301,14 @@ module.controller('ResourceServerScopeDetailCtrl', function($scope, $http, $rout
                     }
                 }, true);
 
+                $scope.originalScope = angular.copy($scope.scope);
+
                 $scope.save = function() {
-                    ResourceServerScope.update({realm : realm.realm, client : $scope.client.id, id : $scope.scope.id}, $scope.scope, function() {
-                        $scope.changed = false;
-                        Notifications.success("The scope has been updated.");
+                    $instance.checkNameAvailability(function () {
+                        ResourceServerScope.update({realm : realm.realm, client : $scope.client.id, id : $scope.scope.id}, $scope.scope, function() {
+                            $scope.changed = false;
+                            Notifications.success("The scope has been updated.");
+                        });
                     });
                 }
 
@@ -288,12 +334,29 @@ module.controller('ResourceServerScopeDetailCtrl', function($scope, $http, $rout
                 }
 
                 $scope.reset = function() {
-                    $scope.scope = angular.copy(data);
-                    $scope.changed = false;
+                    $route.reload();
                 }
             });
         }
     });
+
+    $scope.checkNewNameAvailability = function () {
+        $instance.checkNameAvailability(function () {});
+    }
+
+    this.checkNameAvailability = function (onSuccess) {
+        ResourceServerScope.search({
+            realm : $route.current.params.realm,
+            client : client.id,
+            name: $scope.scope.name
+        }, function(data) {
+            if (data && data.id && data.id != $scope.scope.id) {
+                Notifications.error("Name already in use by another scope, please choose another one.");
+            } else {
+                onSuccess();
+            }
+        });
+    }
 });
 
 module.controller('ResourceServerPolicyCtrl', function($scope, $http, $route, $location, realm, ResourceServer, ResourceServerPolicy, PolicyProvider, client) {
@@ -481,7 +544,7 @@ module.controller('ResourceServerPolicyResourceDetailCtrl', function($scope, $ro
     }, realm, client, $scope);
 });
 
-module.controller('ResourceServerPolicyScopeDetailCtrl', function($scope, $route, realm, client, PolicyController, ResourceServerPolicy, ResourceServerResource, ResourceServerScope) {
+module.controller('ResourceServerPolicyScopeDetailCtrl', function($scope, $route, $location, realm, client, PolicyController, ResourceServerPolicy, ResourceServerResource, ResourceServerScope) {
     PolicyController.onInit({
         getPolicyType : function() {
             return "scope";
@@ -571,6 +634,12 @@ module.controller('ResourceServerPolicyScopeDetailCtrl', function($scope, $route
             newPolicy.decisionStrategy = 'UNANIMOUS';
             newPolicy.config = {};
             newPolicy.config.resources = '';
+
+            var scopeId = $location.search()['scpid'];
+
+            if (scopeId) {
+                newPolicy.config.scopes = [scopeId];
+            }
         },
 
         onCreate : function() {
@@ -596,9 +665,25 @@ module.controller('ResourceServerPolicyUserDetailCtrl', function($scope, $route,
         },
 
         onInit : function() {
-            User.query({realm: $route.current.params.realm}, function(data) {
-                $scope.users = data;
-            });
+            $scope.usersUiSelect = {
+                minimumInputLength: 1,
+                delay: 500,
+                allowClear: true,
+                query: function (query) {
+                    var data = {results: []};
+                    if ('' == query.term.trim()) {
+                        query.callback(data);
+                        return;
+                    }
+                    User.query({realm: $route.current.params.realm, search: query.term.trim(), max: 20}, function(response) {
+                        data.results = response;
+                        query.callback(data);
+                    });
+                },
+                formatResult: function(object, container, query) {
+                    return object.username;
+                }
+            };
 
             $scope.selectedUsers = [];
 
@@ -607,7 +692,14 @@ module.controller('ResourceServerPolicyUserDetailCtrl', function($scope, $route,
                     return;
                 }
 
-                $scope.selectedUser = {};
+                $scope.selectedUser = null;
+
+                for (i = 0; i < $scope.selectedUsers.length; i++) {
+                    if ($scope.selectedUsers[i].id == user.id) {
+                        return;
+                    }
+                }
+
                 $scope.selectedUsers.push(user);
             }
 
@@ -659,7 +751,7 @@ module.controller('ResourceServerPolicyUserDetailCtrl', function($scope, $route,
     }, realm, client, $scope);
 });
 
-module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route, realm, client, PolicyController, Role, RoleById) {
+module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route, realm, client, Client, ClientRole, PolicyController, Role, RoleById) {
     PolicyController.onInit({
         getPolicyType : function() {
             return "role";
@@ -670,6 +762,10 @@ module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route,
                 $scope.roles = data;
             });
 
+            Client.query({realm: $route.current.params.realm}, function (data) {
+                $scope.clients = data;
+            });
+
             $scope.selectedRoles = [];
 
             $scope.selectRole = function(role) {
@@ -677,12 +773,64 @@ module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route,
                     return;
                 }
 
-                $scope.selectedRole = {};
+                $scope.selectedRole = null;
+
+                for (i = 0; i < $scope.selectedRoles.length; i++) {
+                    if ($scope.selectedRoles[i].id == role.id) {
+                        return;
+                    }
+                }
+
                 $scope.selectedRoles.push(role);
+
+                var clientRoles = [];
+
+                if ($scope.clientRoles) {
+                    for (i = 0; i < $scope.clientRoles.length; i++) {
+                        if ($scope.clientRoles[i].id != role.id) {
+                            clientRoles.push($scope.clientRoles[i]);
+                        }
+                    }
+                    $scope.clientRoles = clientRoles;
+                }
             }
 
-            $scope.removeFromList = function(list, index) {
-                list.splice(index, 1);
+            $scope.removeFromList = function(role) {
+                if ($scope.clientRoles && $scope.selectedClient && $scope.selectedClient.id == role.containerId) {
+                    $scope.clientRoles.push(role);
+                }
+                var index = $scope.selectedRoles.indexOf(role);
+                if (index != -1) {
+                    $scope.selectedRoles.splice(index, 1);
+                }
+            }
+
+            $scope.selectClient = function() {
+                if (!$scope.selectedClient) {
+                    $scope.clientRoles = [];
+                    return;
+                }
+                ClientRole.query({realm: $route.current.params.realm, client: $scope.selectedClient.id}, function(data) {
+                    var roles = [];
+
+                    for (j = 0; j < data.length; j++) {
+                        var defined = false;
+
+                        for (i = 0; i < $scope.selectedRoles.length; i++) {
+                            if ($scope.selectedRoles[i].id == data[j].id) {
+                                defined = true;
+                                break;
+                            }
+                        }
+
+                        if (!defined) {
+                            data[j].container = {};
+                            data[j].container.name = $scope.selectedClient.clientId;
+                            roles.push(data[j]);
+                        }
+                    }
+                    $scope.clientRoles = roles;
+                });
             }
         },
 
@@ -693,7 +841,18 @@ module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route,
                 var roles = eval(policy.config.roles);
 
                 for (i = 0; i < roles.length; i++) {
-                    RoleById.get({realm: $route.current.params.realm, role: roles[i]}, function(data) {
+                    RoleById.get({realm: $route.current.params.realm, role: roles[i].id}, function(data) {
+                        for (i = 0; i < roles.length; i++) {
+                            if (roles[i].id == data.id) {
+                                data.required = roles[i].required ? true : false;
+                            }
+                        }
+                        for (i = 0; i < $scope.clients.length; i++) {
+                            if ($scope.clients[i].id == data.containerId) {
+                                data.container = {};
+                                data.container.name = $scope.clients[i].clientId;
+                            }
+                        }
                         selectedRoles.push(data);
                         $scope.selectedRoles = angular.copy(selectedRoles);
                     });
@@ -711,7 +870,12 @@ module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route,
             var roles = [];
 
             for (i = 0; i < $scope.selectedRoles.length; i++) {
-                roles.push($scope.selectedRoles[i].id);
+                var role = {};
+                role.id = $scope.selectedRoles[i].id;
+                if ($scope.selectedRoles[i].required) {
+                    role.required = $scope.selectedRoles[i].required;
+                }
+                roles.push(role);
             }
 
             $scope.policy.config.roles = JSON.stringify(roles);
@@ -721,12 +885,35 @@ module.controller('ResourceServerPolicyRoleDetailCtrl', function($scope, $route,
             var roles = [];
 
             for (i = 0; i < $scope.selectedRoles.length; i++) {
-                roles.push($scope.selectedRoles[i].id);
+                var role = {};
+                role.id = $scope.selectedRoles[i].id;
+                if ($scope.selectedRoles[i].required) {
+                    role.required = $scope.selectedRoles[i].required;
+                }
+                roles.push(role);
             }
 
             $scope.policy.config.roles = JSON.stringify(roles);
         }
     }, realm, client, $scope);
+    
+    $scope.hasRealmRole = function () {
+        for (i = 0; i < $scope.selectedRoles.length; i++) {
+            if (!$scope.selectedRoles[i].clientRole) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    $scope.hasClientRole = function () {
+        for (i = 0; i < $scope.selectedRoles.length; i++) {
+            if ($scope.selectedRoles[i].clientRole) {
+                return true;
+            }
+        }
+        return false;
+    }
 });
 
 module.controller('ResourceServerPolicyJSDetailCtrl', function($scope, $route, $location, realm, PolicyController, client) {
@@ -845,6 +1032,8 @@ module.service("PolicyController", function($http, $route, $location, ResourceSe
 
         delegate.onInit();
 
+        var $instance = this;
+
         ResourceServer.get({
             realm : $route.current.params.realm,
             client : client.id
@@ -876,17 +1065,19 @@ module.service("PolicyController", function($http, $route, $location, ResourceSe
                 }, true);
 
                 $scope.save = function() {
-                    if (delegate.onCreate) {
-                        delegate.onCreate();
-                    }
-                    ResourceServerPolicy.save({realm : realm.realm, client : client.id}, $scope.policy, function(data) {
-                        if (delegate.isPermission()) {
-                            $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/permission/" + $scope.policy.type + "/" + data.id);
-                            Notifications.success("The permission has been created.");
-                        } else {
-                            $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/policy/" + $scope.policy.type + "/" + data.id);
-                            Notifications.success("The policy has been created.");
+                    $instance.checkNameAvailability(function () {
+                        if (delegate.onCreate) {
+                            delegate.onCreate();
                         }
+                        ResourceServerPolicy.save({realm : realm.realm, client : client.id}, $scope.policy, function(data) {
+                            if (delegate.isPermission()) {
+                                $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/permission/" + $scope.policy.type + "/" + data.id);
+                                Notifications.success("The permission has been created.");
+                            } else {
+                                $location.url("/realms/" + realm.realm + "/clients/" + client.id + "/authz/resource-server/policy/" + $scope.policy.type + "/" + data.id);
+                                Notifications.success("The policy has been created.");
+                            }
+                        });
                     });
                 }
 
@@ -903,6 +1094,7 @@ module.service("PolicyController", function($http, $route, $location, ResourceSe
                     client : client.id,
                     id : $route.current.params.id,
                 }, function(data) {
+                    $scope.originalPolicy = data;
                     var policy = angular.copy(data);
 
                     if (delegate.onInitUpdate) {
@@ -919,16 +1111,18 @@ module.service("PolicyController", function($http, $route, $location, ResourceSe
                     }, true);
 
                     $scope.save = function() {
-                        if (delegate.onUpdate) {
-                            delegate.onUpdate();
-                        }
-                        ResourceServerPolicy.update({realm : realm.realm, client : client.id, id : $scope.policy.id}, $scope.policy, function() {
-                            $route.reload();
-                            if (delegate.isPermission()) {
-                                Notifications.success("The permission has been updated.");
-                            } else {
-                                Notifications.success("The policy has been updated.");
+                        $instance.checkNameAvailability(function () {
+                            if (delegate.onUpdate) {
+                                delegate.onUpdate();
                             }
+                            ResourceServerPolicy.update({realm : realm.realm, client : client.id, id : $scope.policy.id}, $scope.policy, function() {
+                                $route.reload();
+                                if (delegate.isPermission()) {
+                                    Notifications.success("The permission has been updated.");
+                                } else {
+                                    Notifications.success("The policy has been updated.");
+                                }
+                            });
                         });
                     }
 
@@ -971,6 +1165,24 @@ module.service("PolicyController", function($http, $route, $location, ResourceSe
                 }
             }
         });
+
+        $scope.checkNewNameAvailability = function () {
+            $instance.checkNameAvailability(function () {});
+        }
+
+        this.checkNameAvailability = function (onSuccess) {
+            ResourceServerPolicy.search({
+                realm: $route.current.params.realm,
+                client: client.id,
+                name: $scope.policy.name
+            }, function(data) {
+                if (data && data.id && data.id != $scope.policy.id) {
+                    Notifications.error("Name already in use by another policy or permission, please choose another one.");
+                } else {
+                    onSuccess();
+                }
+            });
+        }
     }
 
     return PolicyController;
@@ -1137,12 +1349,29 @@ module.controller('PolicyEvaluateCtrl', function($scope, $http, $route, $locatio
                 rsrid: $scope.newResource._id
             }, function (data) {
                 $scope.scopes = data.scopes;
+                if (data.typedScopes) {
+                    for (i=0;i<data.typedScopes.length;i++) {
+                        $scope.scopes.push(data.typedScopes[i]);
+                    }
+                }
             });
         } else {
             ResourceServerScope.query({realm : realm.realm, client : client.id}, function (data) {
                 $scope.scopes = data;
             });
         }
+    }
+
+    $scope.reevaluate = function() {
+        if ($scope.authzRequest.entitlements) {
+            $scope.entitlements();
+        } else {
+            $scope.save();
+        }
+    }
+
+    $scope.showAuthzData = function() {
+        $scope.showRpt = true;
     }
 
     $scope.save = function() {
@@ -1172,15 +1401,34 @@ module.controller('PolicyEvaluateCtrl', function($scope, $http, $route, $locatio
 
     $scope.showResultTab = function() {
         $scope.showResult = true;
+        $scope.showRpt = false;
     }
 
     $scope.showRequestTab = function() {
         $scope.showResult = false;
+        $scope.showRpt = false;
     }
 
-    User.query({realm: $route.current.params.realm}, function(data) {
-        $scope.users = data;
-    });
+    $scope.usersUiSelect = {
+        minimumInputLength: 1,
+        delay: 500,
+        allowClear: true,
+        query: function (query) {
+            var data = {results: []};
+            if ('' == query.term.trim()) {
+                query.callback(data);
+                return;
+            }
+            User.query({realm: $route.current.params.realm, search: query.term.trim(), max: 20}, function(response) {
+                data.results = response;
+                query.callback(data);
+            });
+        },
+        formatResult: function(object, container, query) {
+            object.text = object.username;
+            return object.username;
+        }
+    };
 
     ResourceServerResource.query({realm : realm.realm, client : client.id}, function (data) {
         $scope.resources = data;
@@ -1192,4 +1440,15 @@ module.controller('PolicyEvaluateCtrl', function($scope, $http, $route, $locatio
     }, function(data) {
         $scope.server = data;
     });
+
+    $scope.selectUser = function(user) {
+        if (!user || !user.id) {
+            $scope.selectedUser = null;
+            $scope.authzRequest.userId = '';
+            return;
+        }
+
+        $scope.authzRequest.userId = user.id;
+    }
+
 });
