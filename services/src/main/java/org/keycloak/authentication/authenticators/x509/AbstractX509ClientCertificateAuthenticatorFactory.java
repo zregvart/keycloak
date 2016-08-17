@@ -35,7 +35,7 @@ import static org.keycloak.provider.ProviderConfigProperty.PASSWORD;
 import static org.keycloak.provider.ProviderConfigProperty.STRING_TYPE;
 
 /**
- * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
+ * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
  * @date 7/31/2016
  */

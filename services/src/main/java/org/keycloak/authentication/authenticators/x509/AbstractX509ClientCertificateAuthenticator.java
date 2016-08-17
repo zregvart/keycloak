@@ -27,7 +27,7 @@ import java.security.cert.X509Certificate;
 import java.util.Map;
 
 /**
- * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
+ * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
  * @date 7/31/2016
  */
@@ -42,26 +42,26 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String JAVAX_NET_SSL_TRUST_STORE_TYPE = "javax.net.ssl.trustStoreType";
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
 
-    static final String REGULAR_EXPRESSION = "x509-cert-auth.regular-expression";
-    static final String ENABLE_CRL = "x509-cert-auth.crl-checking-enabled";
-    static final String ENABLE_OCSP = "x509-cert-auth.ocsp-checking-enabled";
-    static final String ENABLE_CRLDP = "x509-cert-auth.crldp-checking-enabled";
-    static final String CRL_RELATIVE_PATH = "x509-cert-auth.crl-relative-path";
-    static final String OCSPRESPONDER_URI = "x509-cert-auth.ocsp-responder-uri";
-    static final String MAXCERTPATHDEPTH = "x509-cert-auth.maximum-certpath-depth";
-    static final String MAPPING_SOURCE_SELECTION = "x509-cert-auth.mapping-source-selection";
-    static final String MAPPING_SOURCE_CERT_SUBJECTDN = "Certificate SubjectDN";
-    static final String MAPPING_SOURCE_CERT_ISSUERDN = "Certificate IssuerDN";
-    static final String MAPPING_SOURCE_CERT_SERIALNUMBER = "Certificate Serial Number";
-    static final String USER_MAPPER_SELECTION = "x509-cert-auth.mapper-selection";
-    static final String USER_ATTRIBUTE_MAPPER = "Custom Attribute Mapper";
-    static final String USERNAME_EMAIL_MAPPER = "Username or Email";
-    static final String CUSTOM_ATTRIBUTE_NAME = "x509-cert-auth.mapper-selection.user-attribute-name";
-    static final String CERTIFICATE_KEY_USAGE = "x509-cert-auth.keyusage";
-    static final String CERTIFICATE_EXTENDED_KEY_USAGE = "x509-cert-auth.extendedkeyusage";
-    static final String TRUSTSTORE_PATH = "x509-cert-auth.truststore-path";
-    static final String TRUSTSTORE_PASSWORD = "x509-cert-auth.truststore-password";
-    static final String TRUSTSTORE_TYPE = "x509-cert-auth.truststore-type";
+    public static final String REGULAR_EXPRESSION = "x509-cert-auth.regular-expression";
+    public static final String ENABLE_CRL = "x509-cert-auth.crl-checking-enabled";
+    public static final String ENABLE_OCSP = "x509-cert-auth.ocsp-checking-enabled";
+    public static final String ENABLE_CRLDP = "x509-cert-auth.crldp-checking-enabled";
+    public static final String CRL_RELATIVE_PATH = "x509-cert-auth.crl-relative-path";
+    public static final String OCSPRESPONDER_URI = "x509-cert-auth.ocsp-responder-uri";
+    public static final String MAXCERTPATHDEPTH = "x509-cert-auth.maximum-certpath-depth";
+    public static final String MAPPING_SOURCE_SELECTION = "x509-cert-auth.mapping-source-selection";
+    public static final String MAPPING_SOURCE_CERT_SUBJECTDN = "Certificate SubjectDN";
+    public static final String MAPPING_SOURCE_CERT_ISSUERDN = "Certificate IssuerDN";
+    public static final String MAPPING_SOURCE_CERT_SERIALNUMBER = "Certificate Serial Number";
+    public static final String USER_MAPPER_SELECTION = "x509-cert-auth.mapper-selection";
+    public static final String USER_ATTRIBUTE_MAPPER = "Custom Attribute Mapper";
+    public static final String USERNAME_EMAIL_MAPPER = "Username or Email";
+    public static final String CUSTOM_ATTRIBUTE_NAME = "x509-cert-auth.mapper-selection.user-attribute-name";
+    public static final String CERTIFICATE_KEY_USAGE = "x509-cert-auth.keyusage";
+    public static final String CERTIFICATE_EXTENDED_KEY_USAGE = "x509-cert-auth.extendedkeyusage";
+    public static final String TRUSTSTORE_PATH = "x509-cert-auth.truststore-path";
+    public static final String TRUSTSTORE_PASSWORD = "x509-cert-auth.truststore-password";
+    public static final String TRUSTSTORE_TYPE = "x509-cert-auth.truststore-type";
     static final String DEFAULT_MATCH_ALL_EXPRESSION = "(.*?)(?:$)";
 
     protected static String firstOrDefault(String value, String defaultValue) {
