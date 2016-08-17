@@ -18,9 +18,19 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.DERIA5String;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.x509.*;
 import org.keycloak.services.ServicesLogger;
 import sun.security.provider.certpath.OCSP;
 
+import javax.naming.Context;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -33,7 +43,7 @@ import java.security.cert.*;
 import java.util.*;
 
 /**
- * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
+ * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
  * @date 7/30/2016
  */
@@ -41,6 +51,8 @@ import java.util.*;
 public class CertificateValidator {
 
     private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+
+    private static final String CRL_DISTRIBUTION_POINTS_OID = "2.5.29.31";
 
     enum KeyUsageBits {
         DIGITAL_SIGNATURE(0, "digitalSignature"),
@@ -282,6 +294,34 @@ public class CertificateValidator {
 
     }
 
+    static private Collection<X509CRL> loadCRLFromLDAP(CertificateFactory cf, URI remoteURI) throws GeneralSecurityException {
+        Hashtable env = new Hashtable(11);
+        env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+        env.put(Context.PROVIDER_URL, remoteURI.toString());
+
+        try {
+            DirContext ctx = new InitialDirContext(env);
+            try {
+                Attributes attrs = ctx.getAttributes("");
+                Attribute cRLAttribute = attrs.get("certificateRevocationList;binary");
+                byte[] data = (byte[])cRLAttribute.get();
+                if (data == null || data.length == 0) {
+                    throw new CertificateException(String.format("Failed to download CRL from \"%s\"", remoteURI.toString()));
+                }
+                X509CRL crl = loadFromStream(cf, new ByteArrayInputStream(data));
+                return Collections.singleton(crl);
+            } finally {
+                ctx.close();
+            }
+        } catch (NamingException e) {
+            logger.error(e.getMessage());
+        } catch(IOException e) {
+            logger.error(e.getMessage());
+        }
+
+        return Collections.emptyList();
+    }
+
     static private Collection<X509CRL> loadCRLFromFile(CertificateFactory cf, String relativePath) throws GeneralSecurityException {
         try {
             String configDir = System.getProperty("jboss.server.config.dir");
@@ -307,17 +347,25 @@ public class CertificateValidator {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         Collection<X509CRL> crlColl = null;
 
-        if (cRLPath != null && (cRLPath.startsWith("http") || cRLPath.startsWith("https"))) {
-            // load CRL using remote URI
-            try {
-                crlColl = loadFromURI(cf, new URI(cRLPath));
-            } catch (URISyntaxException e) {
-                logger.error(e.getMessage());
+        if (cRLPath != null) {
+            if (cRLPath.startsWith("http") || cRLPath.startsWith("https")) {
+                // load CRL using remote URI
+                try {
+                    crlColl = loadFromURI(cf, new URI(cRLPath));
+                } catch (URISyntaxException e) {
+                    logger.error(e.getMessage());
+                }
+            } else if (cRLPath.startsWith("ldap")) {
+                // load CRL from LDAP
+                try {
+                    crlColl = loadCRLFromLDAP(cf, new URI(cRLPath));
+                } catch(URISyntaxException e) {
+                    logger.error(e.getMessage());
+                }
+            } else {
+                // load CRL from file
+                crlColl = loadCRLFromFile(cf, cRLPath);
             }
-        }
-        else {
-            // load CRL from file
-            crlColl = loadCRLFromFile(cf, cRLPath);
         }
         if (crlColl != null && crlColl.size() > 0) {
             for (X509CRL it : crlColl) {
@@ -332,13 +380,63 @@ public class CertificateValidator {
             throw new GeneralSecurityException(message);
         }
     }
+    // See www.nakov.com/blog/2009/12/01/x509-certificate-validation-in-java-build-and-verify-cchain-and-verify-clr-with-bouncy-castle/
+    private static List<String> getCRLDistributionPoints(X509Certificate cert) {
+        byte[] data = cert.getExtensionValue(CRL_DISTRIBUTION_POINTS_OID);
+        if (data == null)
+            return new ArrayList<>();
+
+        List<String> dps = new LinkedList<>();
+        ASN1InputStream is = new ASN1InputStream(new ByteArrayInputStream(data));
+        try {
+            DEROctetString octetString = (DEROctetString)is.readObject();
+            byte[] octets = octetString.getOctets();
+
+            ASN1InputStream is2 = new ASN1InputStream(new ByteArrayInputStream(octets));
+            CRLDistPoint crlDP = CRLDistPoint.getInstance(is2.readObject());
+
+            for (DistributionPoint dp : crlDP.getDistributionPoints()) {
+                DistributionPointName dpn = dp.getDistributionPoint();
+                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
+                    GeneralName[] names = GeneralNames.getInstance(dpn.getName()).getNames();
+                    for (GeneralName gn : names) {
+                        if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
+                            String url = DERIA5String.getInstance(gn.getName()).getString();
+                            dps.add(url);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.error(e.getMessage());
+        } catch(ClassCastException e) {
+            logger.error(e.getMessage());
+        }
+
+        return dps;
+    }
+
+    private static void checkRevocationStatusUsingCRLDistributionPoints(X509Certificate[] certs) throws GeneralSecurityException {
+
+        List<String> distributionPoints = getCRLDistributionPoints(certs[0]);
+        if (distributionPoints == null || distributionPoints.size() == 0) {
+            throw new GeneralSecurityException("Could not find any CRL distribution points in the certificate, unable to check the certificate revocation status using CRL/DP.");
+        }
+        for (String dp : distributionPoints) {
+            logger.debugf("CRL Distribution point: \"%s\"", dp);
+            checkRevocationStatusUsingCRL(certs, dp);
+        }
+    }
 
     CertificateValidator checkRevocationStatus() throws GeneralSecurityException {
         if (!(_crlCheckingEnabled || _crldpEnabled || _ocspEnabled)) {
             return this;
         }
         if (_crlCheckingEnabled || _crldpEnabled) {
-            checkRevocationStatusUsingCRL(_certChain, _cRLRelativePath /*"crl.pem"*/);
+            if (_crlCheckingEnabled && !_crldpEnabled) {
+                checkRevocationStatusUsingCRL(_certChain, _cRLRelativePath /*"crl.pem"*/);
+            }
+            checkRevocationStatusUsingCRLDistributionPoints(_certChain);
         }
         if (_ocspEnabled) {
             checkRevocationUsingOCSP(_certChain, _responderUri);

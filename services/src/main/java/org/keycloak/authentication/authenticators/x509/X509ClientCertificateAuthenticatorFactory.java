@@ -23,7 +23,7 @@ import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
 
 /**
- * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
+ * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
  *
  */

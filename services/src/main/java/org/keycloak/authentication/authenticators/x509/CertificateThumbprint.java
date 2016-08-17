@@ -24,7 +24,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 
 /**
- * @author <a href="mailto:petervn1@yahoo.com">Peter Nalyvayko</a>
+ * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
  * @date 7/31/2016
  */
