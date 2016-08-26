@@ -9,6 +9,24 @@ The implementation supports Browser and Direct Grant Flows.
  - Browser Flow corresponds to OAuth 2.0 Implicit Flow
  - Direct Grant Flow corresponds to OAuth 2.0 Resource Owner Password Credential Flow
 
+## Features
+
+ - Regular expression based user identity extraction using the certificate's fields: 
+    - Subject DN
+    - Issuer DN
+    - Serial Number
+ - Supported User Identity/User mappings:
+    - User identity to Username or E-mail
+    - User identity to User Custom Attribute
+ - Revocation status checking using CLR
+ - Revocation status checking using CRL/Distribution Point
+ - Revocation status checking using OCSP/Responder URI
+ - Certificate KeyUsage validation
+ - Certificate ExtendedKeyUsage validation
+ - Certificate PKI path validation
+ - Certificate dates validation
+
+
 ## Configure WildFly to enable mutual SSL
 
 - The first step is configure WildFly to enable mutual SSL authentication.
@@ -80,10 +98,16 @@ optionally ask for a client certificate during SSL handshake.
 
 There are several ways to extract a user identity from a X509 certificate. Most common
 strategy is to use a regular expression to extract a username or an e-mail from the
-certificate subject's name.
+certificate subject's name . For example, the regular expression below
+will match the e-mail field of subject's DN:
+```
+emailAddress=(.*?)(?:,|$)
+```
+
 Another strategy is to user the issuer's name to extract the user identity. This can
 be useful to map multiple certificates to a single user in keycloak.
 Lastly, the certificate's serial number can be used a the user identity.
+
 
 ### Mapping user identity to existing user
 
