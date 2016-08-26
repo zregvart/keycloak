@@ -222,12 +222,12 @@ public class CertificateValidator {
                 rs = OCSP.check(certs[0], certs[1]);
             }
             else {
-                URI uri = null;
+                URI uri;
                 try {
                     uri = new URI(responderUri);
                 } catch (URISyntaxException e) {
                     String message = String.format("Unable to check certificate revocation status using OCSP.\n%s", e.getMessage());
-                    new GeneralSecurityException(message);
+                    throw new GeneralSecurityException(message);
                 }
                 logger.debugf("Responder URI \"%s\" will be used to verify revocation status of the certificate using OCSP", uri.toString());
                 // Obtains the revocation status of a certificate using OCSP.
