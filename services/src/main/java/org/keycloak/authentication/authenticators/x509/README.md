@@ -20,7 +20,6 @@ The instructions how to it can be found in WildFly 9 documentation:
 https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-EnableSSL.
 
 <security-realms>
-<!-- ... -->
     <security-realm name="ssl-realm">
         <server-identities>
              <ssl>
@@ -31,7 +30,6 @@ https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-EnableSSL.
              <truststore path="[trusted store].jks" relative-to="jboss.server.config.dir" keystore-password="[password]"/>
         </authentication>
     </security-realm>
-<!-- ... -->
 </security-realms>
 
 Where
@@ -41,16 +39,14 @@ Where
   that were used to sign the client certificates.
 
 - Next is to enable Https listener to allow secure access to the server.
-  See https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-HTTPSlistener for
-  instructions how to configure WildFly to enable Https.
+See https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-HTTPSlistener for
+instructions how to configure WildFly to enable Https.
 
 <subsystem xmlns="urn:jboss:domain:undertow:3.0">
     <buffer-cache name="default"/>
-        <server name="default-server">
-        <!-- ... -->
-            <https-listener name="default" socket-binding="https" security-realm="ssl-realm" verify-client="requested"/>
-        <!-- ... -->
-        </server>
+    <server name="default-server">
+        <https-listener name="default" socket-binding="https" security-realm="ssl-realm" verify-client="requested"/>
+    </server>
 </subsystem>
 
 Make sure that the "security-realm" option is set to whatever security realm which defines
@@ -73,6 +69,8 @@ Authenticating users using X509 client certificate
   - Validate the certificate trust path
   - Check the certificate revocation status using CRL and/or CRL Distribution Points
   - Check the Certificate revocation status using OCSP
+  - Validate certificate's key usage
+  - Validate certificate's extended key usage
 - The server extracts the user identity and maps to to an existing user
 - Once the certificate is mapped to an existing user, the behavior diverges depending on the Flow:
   - In the Browser flow, the server prompts the user to confirm whether to continue with the found identity or to ignore it
@@ -97,19 +95,19 @@ to a username or e-mail or to a user with a custom attribute which value matches
 the extracted user identity.
 
 ----
-Configure Browser Flow to enable X509 Certificate Authentication
+X509 Certificate Authentication using Browser Flow
 ----
-To configure Browser flow to support X509 client certificate authentication:
-* Make a copy of "Browser" flow and give it a name "x509 Browser"
+* Using keycloak admin console, click on "Authentication" and select "Browser" flow
+* Make a copy of "Browser" flow and enter "x509 Browser" to be the name of the new flow
 * Click on add execution .. and add "X509/Validate Username Form"
 * Using up/down buttons, move the newly added execution above "x509 Forms" Auth Type entry
 * Configure the x509 authentication by clicking on "Actions/Config"
 
 ----
-Configure Direct Grant Flow to enable X509 Certificate Authentication
+X509 Certificate Authentication using Direct Grant Flow
 ----
-To configure Direct Grant Flow to use mutual SSL and X509 client certificate:
-* Make a copy of "Direct Grant" flow and give it a name "Direct Grant using mutual SSL"
+* Using keycloak admin console, click on "Authentication" and select "Direct Grant" flow
+* Make a copy of "Direct Grant" flow and enter "x509 Direct Grant" to be the name of the new flow
 * Delete "Validate Username" and "Password" authenticators
 * Click on "Execution" and add "X509/Validate Username" and sets the type to "REQUIRED"
 * Optionally, you can validate that the certificate thumbprint matches the thumbprint of a
@@ -120,24 +118,23 @@ To configure Direct Grant Flow to use mutual SSL and X509 client certificate:
 
 To verify Direct Grant, run the following command:
 
-$ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --insecure \
-       --data "grant_type=password&scope=openid profile&username=&password=" \
-       --user [client_id]:[client_secret] \
-       -E /path/to/[client_cert].pem \
+$ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --insecure
+       --data "grant_type=password&scope=openid profile&username=&password="
+       --user [client_id]:[client_secret]
+       -E /path/to/[client_cert].crt
        --key /path/to/[client_cert].key
 
-Where
-* [host][:port] is the keycloak server host address
-* [client_id]  is OAuth2 client id, i.e. "oauth2.client"
-* [client_secret] is the OAuth2 client secret, i.e. "aa0f9e94-745c-4f41-9160-1507c3f11153"
-* [client_cert].pem is the client certificate public key in PEM format
-* [client_cert].key is the client certificate private key in PEM format
+* [host][:port] is the address of the remote keycloak server instance
+* [client_id]  is OIDC client id, i.e. "oauth2.client"
+* [client_secret] is OIDC client secret, i.e. "aa0f9e94-745c-4f41-9160-1507c3f11153"
+* [client_cert].crt is a public client certificate in PEM format
+* [client_cert].key is private key in PEM format
 
 ----
 Running the tests
 ----
 
-The following command executes X509 authentication related tests:
+TBD
  
-$ mvn test -f testsuite/integration-arquillian/tests/base/pom.xml -Dtest=*X509Cert*
+$ mvn test -f testsuite/integration-arquillian/tests/base/pom.xml -Dtest=\*X509Cert\*
 
