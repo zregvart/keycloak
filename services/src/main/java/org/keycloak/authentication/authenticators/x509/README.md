@@ -1,6 +1,4 @@
-=================================================
-Mutual SSL User Authentication
-=================================================
+# Mutual SSL User Authentication
 
 The authentication mechanism by which the user is authenticated using
 the client's public key certificate.
@@ -11,14 +9,13 @@ The implementation supports Browser and Direct Grant Flows.
  - Browser Flow corresponds to OAuth 2.0 Implicit Flow
  - Direct Grant Flow corresponds to OAuth 2.0 Resource Owner Password Credential Flow
 
----
-Configure WildFly to enable mutual SSL
----
+## Configure WildFly to enable mutual SSL
 
 - The first step is configure WildFly to enable mutual SSL authentication.
 The instructions how to it can be found in WildFly 9 documentation:
 https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-EnableSSL.
 
+```
 <security-realms>
     <security-realm name="ssl-realm">
         <server-identities>
@@ -31,6 +28,7 @@ https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-EnableSSL.
         </authentication>
     </security-realm>
 </security-realms>
+```
 
 Where
   - [server].jks contains an X509 private key used for both inbound and outbound SSL connections
@@ -42,12 +40,14 @@ Where
 See https://docs.jboss.org/author/display/WFLY9/Admin+Guide#AdminGuide-HTTPSlistener for
 instructions how to configure WildFly to enable Https.
 
+```
 <subsystem xmlns="urn:jboss:domain:undertow:3.0">
     <buffer-cache name="default"/>
     <server name="default-server">
         <https-listener name="default" socket-binding="https" security-realm="ssl-realm" verify-client="requested"/>
     </server>
 </subsystem>
+```
 
 Make sure that the "security-realm" option is set to whatever security realm which defines
 the SSL security context you've configured earlier.
@@ -58,9 +58,8 @@ optionally ask for a client certificate during SSL handshake.
 - Install any local client certificates so that the browser can find
   them when negotiating the SSL connection.
 
-----
-Authenticating users using X509 client certificate
-----
+## Authenticating users using X509 client certificate
+
 - A client sends an authentication request over SSL/TLS channel
 - During SSL/TLS handshake, the server and the client exchange their SSL/x.509/v3 digital certificates
   used to encrypt the data used to establish a secret key .
@@ -77,9 +76,8 @@ Authenticating users using X509 client certificate
      and instead sign in using the Username/password Login Form
   - In the Direct Grant Flow, the server signs in the user
 
----
-User Identity Extraction
----
+### User Identity Extraction
+
 There are several ways to extract a user identity from a X509 certificate. Most common
 strategy is to use a regular expression to extract a username or an e-mail from the
 certificate subject's name.
@@ -87,25 +85,23 @@ Another strategy is to user the issuer's name to extract the user identity. This
 be useful to map multiple certificates to a single user in keycloak.
 Lastly, the certificate's serial number can be used a the user identity.
 
----
-Mapping user identity to existing user
----
+### Mapping user identity to existing user
+
 The user identity mapping can be configured to map the extracted user identity
 to a username or e-mail or to a user with a custom attribute which value matches
 the extracted user identity.
 
-----
-X509 Certificate Authentication using Browser Flow
-----
+
+### X509 Certificate Authentication using Browser Flow
+
 * Using keycloak admin console, click on "Authentication" and select "Browser" flow
 * Make a copy of "Browser" flow and enter "x509 Browser" to be the name of the new flow
 * Click on add execution .. and add "X509/Validate Username Form"
 * Using up/down buttons, move the newly added execution above "x509 Forms" Auth Type entry
 * Configure the x509 authentication by clicking on "Actions/Config"
 
-----
-X509 Certificate Authentication using Direct Grant Flow
-----
+### X509 Certificate Authentication using Direct Grant Flow
+
 * Using keycloak admin console, click on "Authentication" and select "Direct Grant" flow
 * Make a copy of "Direct Grant" flow and enter "x509 Direct Grant" to be the name of the new flow
 * Delete "Validate Username" and "Password" authenticators
@@ -118,11 +114,13 @@ X509 Certificate Authentication using Direct Grant Flow
 
 To verify Direct Grant, run the following command:
 
+```
 $ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --insecure
        --data "grant_type=password&scope=openid profile&username=&password="
        --user [client_id]:[client_secret]
        -E /path/to/[client_cert].crt
        --key /path/to/[client_cert].key
+```
 
 * [host][:port] is the address of the remote keycloak server instance
 * [client_id]  is OIDC client id, i.e. "oauth2.client"
@@ -130,11 +128,11 @@ $ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --
 * [client_cert].crt is a public client certificate in PEM format
 * [client_cert].key is private key in PEM format
 
-----
-Running the tests
-----
+## Running the tests
 
 TBD
- 
+
+``` 
 $ mvn test -f testsuite/integration-arquillian/tests/base/pom.xml -Dtest=\*X509Cert\*
+```
 
