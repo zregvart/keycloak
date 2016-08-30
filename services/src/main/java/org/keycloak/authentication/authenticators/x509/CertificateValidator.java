@@ -137,7 +137,19 @@ public class CertificateValidator {
 
     private static void validateKeyUsage(X509Certificate[] certs, int expected) throws GeneralSecurityException {
         boolean[] keyUsageBits = certs[0].getKeyUsage();
-        boolean isCritical = certs[0].getCriticalExtensionOIDs().contains("2.5.29.15");
+        if (keyUsageBits == null) {
+            if (expected != 0) {
+                String message = "Key usage extension is expected, but unavailable.";
+                throw new GeneralSecurityException(message);
+            }
+            return;
+        }
+
+        boolean isCritical = false;
+        Set critSet = certs[0].getCriticalExtensionOIDs();
+        if (critSet != null) {
+            isCritical = critSet.contains("2.5.29.15");
+        }
 
         int n = expected;
 
@@ -160,12 +172,21 @@ public class CertificateValidator {
     }
 
     private static void validateExtendedKeyUsage(X509Certificate[] certs, List<String> expectedEKU) throws GeneralSecurityException {
-        if (expectedEKU == null) {
+        if (expectedEKU == null || expectedEKU.size() == 0) {
             logger.debug("Extended Key Usage validation is not enabled.");
             return;
         }
         List<String> extendedKeyUsage = certs[0].getExtendedKeyUsage();
-        boolean isCritical = certs[0].getCriticalExtensionOIDs().contains("2.5.29.37");
+        if (extendedKeyUsage == null) {
+            String message = "Extended key usage extension is expected, but unavailable";
+            throw new GeneralSecurityException(message);
+        }
+
+        boolean isCritical = false;
+        Set critSet = certs[0].getCriticalExtensionOIDs();
+        if (critSet != null) {
+            isCritical = critSet.contains("2.5.29.37");
+        }
 
         List<String> ekuList = new LinkedList<>();
         extendedKeyUsage.forEach(s -> ekuList.add(s.toLowerCase()));
