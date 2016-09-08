@@ -38,5 +38,6 @@
         <module>rest</module>
         <module>domain-extension</module>
         <module>user-storage-jpa</module>
+        <module>userinfo-attribute-mapper</module>
     </modules>
 </project>
