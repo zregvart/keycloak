@@ -37,9 +37,6 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String DEFAULT_ATTRIBUTE_NAME = "usercertificate";
     protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
 
-    public static final String JAVAX_NET_SSL_TRUST_STORE = "javax.net.ssl.trustStore";
-    public static final String JAVAX_NET_SSL_TRUST_STORE_PASSWORD = "javax.net.ssl.trustStorePassword";
-    public static final String JAVAX_NET_SSL_TRUST_STORE_TYPE = "javax.net.ssl.trustStoreType";
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
 
     public static final String REGULAR_EXPRESSION = "x509-cert-auth.regular-expression";
@@ -48,7 +45,6 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String ENABLE_CRLDP = "x509-cert-auth.crldp-checking-enabled";
     public static final String CRL_RELATIVE_PATH = "x509-cert-auth.crl-relative-path";
     public static final String OCSPRESPONDER_URI = "x509-cert-auth.ocsp-responder-uri";
-    public static final String MAXCERTPATHDEPTH = "x509-cert-auth.maximum-certpath-depth";
     public static final String MAPPING_SOURCE_SELECTION = "x509-cert-auth.mapping-source-selection";
     public static final String MAPPING_SOURCE_CERT_SUBJECTDN = "Certificate SubjectDN";
     public static final String MAPPING_SOURCE_CERT_ISSUERDN = "Certificate IssuerDN";
@@ -59,9 +55,6 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String CUSTOM_ATTRIBUTE_NAME = "x509-cert-auth.mapper-selection.user-attribute-name";
     public static final String CERTIFICATE_KEY_USAGE = "x509-cert-auth.keyusage";
     public static final String CERTIFICATE_EXTENDED_KEY_USAGE = "x509-cert-auth.extendedkeyusage";
-    public static final String TRUSTSTORE_PATH = "x509-cert-auth.truststore-path";
-    public static final String TRUSTSTORE_PASSWORD = "x509-cert-auth.truststore-password";
-    public static final String TRUSTSTORE_TYPE = "x509-cert-auth.truststore-type";
     static final String DEFAULT_MATCH_ALL_EXPRESSION = "(.*?)(?:$)";
 
     protected static String firstOrDefault(String value, String defaultValue) {
@@ -75,11 +68,6 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
             CertificateValidator.CertificateValidatorBuilder builder = new CertificateValidator.CertificateValidatorBuilder();
             return builder
-                    .trustStore()
-                        .setPath(firstOrDefault(config.get(TRUSTSTORE_PATH), System.getProperty(JAVAX_NET_SSL_TRUST_STORE)))
-                        .setPassword(firstOrDefault(config.get(TRUSTSTORE_PASSWORD),System.getProperty(JAVAX_NET_SSL_TRUST_STORE_PASSWORD)))
-                        .setType(firstOrDefault(config.get(TRUSTSTORE_TYPE),
-                                firstOrDefault(System.getProperty(JAVAX_NET_SSL_TRUST_STORE_TYPE), KeyStore.getDefaultType())))
                     .keyUsage()
                         .parse(config.get(CERTIFICATE_KEY_USAGE))
                     .extendedKeyUsage()
