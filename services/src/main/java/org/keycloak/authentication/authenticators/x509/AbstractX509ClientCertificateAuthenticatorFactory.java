@@ -140,25 +140,6 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         extendedKeyUsage.setLabel("Validate Extended Key Usage");
         extendedKeyUsage.setHelpText("Validates the extended purposes of the certificate's key using certificate's Extended Key Usage extension. Leaving the field blank will disable Extended Key Usage validation. See RFC 5280 for a detailed definition of X509 Extended Key Usage extension.");
 
-        ProviderConfigProperty trustStorePath = new ProviderConfigProperty();
-        trustStorePath.setType(STRING_TYPE);
-        trustStorePath.setName(TRUSTSTORE_PATH);
-        trustStorePath.setLabel("Trust Store");
-        trustStorePath.setHelpText("A path to a trust store that will be used to validate X509 client certificates. Path is relative to $jboss.server.config.dir.");
-
-        ProviderConfigProperty trustStorePassword = new ProviderConfigProperty();
-        trustStorePassword.setType(PASSWORD);
-        trustStorePassword.setName(TRUSTSTORE_PASSWORD);
-        trustStorePassword.setLabel("Trust Store Password");
-        trustStorePassword.setHelpText("A password to access trust store entries");
-
-        ProviderConfigProperty trustStoreType = new ProviderConfigProperty();
-        trustStoreType.setType(STRING_TYPE);
-        trustStoreType.setName(TRUSTSTORE_TYPE);
-        trustStoreType.setDefaultValue(KeyStore.getDefaultType());
-        trustStoreType.setLabel("Trust Store Type");
-        trustStoreType.setHelpText("A type of trust store (JKS, etc.) By default, 'jks' type is assumed.");
-
         configProperties = asList(mappingMethodList,
                 regExp,
                 userMapperList,
@@ -169,10 +150,7 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
                 oCspCheckingEnabled,
                 ocspResponderUri,
                 keyUsage,
-                extendedKeyUsage,
-                trustStorePath,
-                trustStorePassword,
-                trustStoreType);
+                extendedKeyUsage);
     }
 
     @Override
