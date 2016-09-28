@@ -74,7 +74,6 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             certificateValidationParameters(parameters)
                     .build(certs)
                         .validDates()
-                        .validateCertificatePath()
                         .checkRevocationStatus()
                         .validateKeyUsage()
                         .validateExtendedKeyUsage();

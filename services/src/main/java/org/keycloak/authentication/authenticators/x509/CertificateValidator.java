@@ -103,7 +103,6 @@ public class CertificateValidator {
     }
 
     X509Certificate[] _certChain;
-    KeyStore _trustStore;
     int _keyUsageBits;
     List<String> _extendedKeyUsage;
     boolean _crlCheckingEnabled;
@@ -111,7 +110,7 @@ public class CertificateValidator {
     String _cRLRelativePath;
     boolean _ocspEnabled;
     String _responderUri;
-    protected CertificateValidator(X509Certificate[] certChain, KeyStore trustStore,
+    protected CertificateValidator(X509Certificate[] certChain,
                          int keyUsageBits, List<String> extendedKeyUsage,
                                    boolean cRLCheckingEnabled,
                                    boolean cRLDPCheckingEnabled,
@@ -119,7 +118,6 @@ public class CertificateValidator {
                                    boolean oCSPCheckingEnabled,
                                    String oCSPResponderURI) {
         _certChain = certChain;
-        _trustStore = trustStore;
         _keyUsageBits = keyUsageBits;
         _extendedKeyUsage = extendedKeyUsage;
         _crlCheckingEnabled = cRLCheckingEnabled;
@@ -210,25 +208,6 @@ public class CertificateValidator {
         validateExtendedKeyUsage(_certChain, _extendedKeyUsage);
         return this;
     }
-    CertificateValidator validateCertificatePath() throws GeneralSecurityException {
-
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        List<X509Certificate> certificates = new LinkedList<>();
-        certificates.add(_certChain[0]);
-        CertPath certPath = cf.generateCertPath(certificates);
-
-        PKIXParameters params = new PKIXParameters(_trustStore);
-        params.setRevocationEnabled(false);
-
-        CertPathValidator pathValidator = CertPathValidator.getInstance(CertPathValidator.getDefaultType());
-
-        logger.debugf("PKIX certificate path validation params: %s", params.toString());
-
-        pathValidator.validate(certPath, params);
-
-        return this;
-    }
-
     private static void checkRevocationUsingOCSP(X509Certificate[] certs, String responderUri) throws GeneralSecurityException {
 
         try {
@@ -475,7 +454,6 @@ public class CertificateValidator {
 
         int _keyUsageBits;
         List<String> _extendedKeyUsage;
-        KeyStore _trustStore;
         boolean _crlCheckingEnabled;
         boolean _crldpEnabled;
         String _cRLRelativePath;
@@ -485,7 +463,6 @@ public class CertificateValidator {
         CertificateValidatorBuilder() {
             _extendedKeyUsage = new LinkedList<>();
             _keyUsageBits = 0;
-            _trustStore = null;
         }
 
         class KeyUsageValidationBuilder {
@@ -584,99 +561,6 @@ public class CertificateValidator {
             }
         }
 
-        class TrustStoreBuilder {
-
-            private String _trustStorePath;
-            private String _trustStorePassword;
-            CertificateValidatorBuilder _parent;
-            TrustStoreBuilder(CertificateValidatorBuilder parent) {
-                _parent = parent;
-            }
-
-            GotTrustStorePath setPath(String trustStorePath) {
-                _trustStorePath = trustStorePath;
-                return new GotTrustStorePath();
-            }
-
-            class GotTrustStorePath {
-                GotTrustStorePassword setPassword(String password) {
-                    _trustStorePassword = password;
-                    return new GotTrustStorePassword();
-                }
-            }
-
-            class GotTrustStorePassword {
-                CertificateValidatorBuilder setType(String type) throws Exception {
-                    if (type == null) {
-                        type = KeyStore.getDefaultType();
-                    }
-                    String javaHome = System.getProperty("java.home");
-                    String path = _trustStorePath;
-                    if (path == null || path.equalsIgnoreCase("NONE")) {
-                        String sep = File.separator;
-                        //
-                        // Figure out a path to the default JVM trust store
-                        //
-                        File f = new File(javaHome + sep
-                                + "lib" + sep
-                                + "security" + sep
-                                + "jssecacerts");
-                        if (f.canRead()) {
-                            path = f.getAbsolutePath();
-                        }
-                        else {
-                            f = new File(javaHome + sep
-                                        + "lib" + sep
-                                        + "security" + sep
-                                        + "cacerts");
-                            path = f.getAbsolutePath();
-                        }
-                    }
-                    _trustStore = loadTrustStoreFromFile(path, _trustStorePassword, type);
-                    if (_trustStore == null) {
-                        throw new IOException("Failed to load certificate trust store.");
-                    }
-                    return _parent;
-                }
-
-                private KeyStore loadTrustStoreFromFile(String path, String password, String type) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
-
-                    KeyStore trustStore = null;
-
-                    if (path != null && password != null) {
-                        try {
-                            logger.infof("Loading certificate trust store from \"%s\"", path);
-
-                            String configDir = System.getProperty("jboss.server.config.dir");
-                            if (configDir != null) {
-                                File f = new File(path);
-                                if (!f.isAbsolute()) {
-                                    f = new File(configDir + File.separator + path);
-                                }
-                                if (f.canRead()) {
-                                    FileInputStream myKeys = new FileInputStream(f.getAbsolutePath());
-                                    trustStore = KeyStore.getInstance(type);
-                                    trustStore.load(myKeys, password.toCharArray());
-                                    myKeys.close();
-                                }
-                                else {
-                                    throw new IOException(String.format("Unable to read a trust store \"%s\".", f.getAbsolutePath()));
-                                }
-                            }
-                            else {
-                                throw new IOException("Unable to resolve a path to the configuration directory.");
-                            }
-                        }
-                        catch (Exception ex) {
-                            logger.error("[TrustStoreBuilder:build] Exception's been caught while trying to load a trust store", ex);
-                            throw ex;
-                        }
-                    }
-                    return trustStore;
-                }
-            }
-        }
-
         class RevocationStatusCheckBuilder {
 
             CertificateValidatorBuilder _parent;
@@ -729,16 +613,12 @@ public class CertificateValidator {
             return new ExtendedKeyUsageValidationBuilder(this);
         }
 
-        TrustStoreBuilder trustStore() {
-            return new TrustStoreBuilder(this);
-        }
-
         RevocationStatusCheckBuilder revocation() {
             return new RevocationStatusCheckBuilder(this);
         }
 
         CertificateValidator build(X509Certificate[] certs) {
-            return new CertificateValidator(certs, _trustStore, _keyUsageBits, _extendedKeyUsage,
+            return new CertificateValidator(certs, _keyUsageBits, _extendedKeyUsage,
                     _crlCheckingEnabled, _crldpEnabled, _cRLRelativePath, _ocspEnabled, _responderUri);
         }
     }
