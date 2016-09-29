@@ -788,6 +788,8 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
     ];
 
     $scope.realm = realm;
+    $scope.wsfedJwt = false;
+    $scope.wsfedX5t = false;
     $scope.samlAuthnStatement = false;
     $scope.samlMultiValuedRoles = false;
     $scope.samlServerSignature = false;
@@ -830,6 +832,22 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
         } else if ($scope.client.attributes['saml_name_id_format'] == 'persistent') {
             $scope.nameIdFormat = $scope.nameIdFormats[3];
         }
+        if ($scope.client.attributes["wsfed.jwt"]) {
+            if ($scope.client.attributes["wsfed.jwt"] == "true") {
+                 $scope.wsfedJwt = true;
+            } else {
+                $scope.wsfedJwt = false;
+            }
+        }
+
+        if ($scope.client.attributes["wsfed.x5t"]) {
+            if ($scope.client.attributes["wsfed.x5t"] == "true") {
+                $scope.wsfedX5t = true;
+            } else {
+                $scope.wsfedX5t = false;
+            }
+        }
+
         if ($scope.client.attributes["saml.server.signature"]) {
             if ($scope.client.attributes["saml.server.signature"] == "true") {
                 $scope.samlServerSignature = true;
@@ -940,6 +958,8 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
             $scope.client.protocol = "openid-connect";
         } else if ($scope.protocol == "saml") {
             $scope.client.protocol = "saml";
+        } else if ($scope.protocol == "wsfed") {
+            $scope.client.protocol = "wsfed";
         }
     };
 
@@ -1017,6 +1037,18 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
 
         if ($scope.newWebOrigin && $scope.newWebOrigin.length > 0) {
             $scope.addWebOrigin();
+        }
+
+        if ($scope.wsfedJwt == true) {
+            $scope.client.attributes["wsfed.jwt"] = "true";
+        } else {
+            $scope.client.attributes["wsfed.jwt"] = "false";
+        }
+
+        if ($scope.wsfedX5t == true) {
+            $scope.client.attributes["wsfed.x5t"] = "true";
+        } else {
+            $scope.client.attributes["wsfed.x5t"] = "false";
         }
 
         if ($scope.samlServerSignature == true) {
@@ -1794,8 +1826,10 @@ module.controller('ClientTemplateDetailCtrl', function($scope, realm, template, 
             $scope.template.protocol = "openid-connect";
         } else if ($scope.protocol == "saml") {
             $scope.template.protocol = "saml";
+        } else if ($scope.protocol == "wsfed") {
+            $scope.client.protocol = "wsfed";
         }
-    };
+ };
 
     $scope.$watch(function() {
         return $location.path();
