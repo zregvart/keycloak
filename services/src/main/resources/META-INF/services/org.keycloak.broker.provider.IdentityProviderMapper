@@ -31,3 +31,5 @@ org.keycloak.social.google.GoogleUserAttributeMapper
 org.keycloak.social.linkedin.LinkedInUserAttributeMapper
 org.keycloak.social.stackoverflow.StackoverflowUserAttributeMapper
 org.keycloak.social.microsoft.MicrosoftUserAttributeMapper
+org.keycloak.broker.wsfed.mappers.AttributeToRoleMapper
+org.keycloak.broker.wsfed.mappers.UserAttributeMapper

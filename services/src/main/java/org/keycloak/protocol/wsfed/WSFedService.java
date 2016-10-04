@@ -185,24 +185,20 @@ public class WSFedService {
             event.error(Errors.CLIENT_NOT_FOUND);
             return ErrorPage.error(session, Messages.UNKNOWN_LOGIN_REQUESTER);
         }
-
         if (!client.isEnabled()) {
             event.event(EventType.LOGIN);
             event.error(Errors.CLIENT_DISABLED);
             return ErrorPage.error(session, Messages.LOGIN_REQUESTER_NOT_ENABLED);
         }
-        if ((client instanceof ClientModel) && client.isBearerOnly()) {
+        if (client.isBearerOnly()) {
             event.event(EventType.LOGIN);
             event.error(Errors.NOT_ALLOWED);
             return ErrorPage.error(session, Messages.BEARER_ONLY);
         }
-        if (client.isDirectAccessGrantsEnabled() &&
-                !client.isImplicitFlowEnabled() &&
-                !client.isServiceAccountsEnabled() &&
-                !client.isStandardFlowEnabled()) {
+        if (!client.isStandardFlowEnabled()) {
             event.event(EventType.LOGIN);
             event.error(Errors.NOT_ALLOWED);
-            return ErrorPage.error(session, "Implicit flow is not supported by the client."/*Messages.DIRECT_GRANTS_ONLY*/);
+            return ErrorPage.error(session, Messages.STANDARD_FLOW_DISABLED);
         }
 
         session.getContext().setClient(client);
@@ -271,6 +267,16 @@ public class WSFedService {
         clientSession.setNote(ClientSessionModel.ACTION_KEY, KeycloakModelUtils.generateCodeSecret());
         clientSession.setNote(WSFedConstants.WSFED_CONTEXT, params.getWsfed_context());
         clientSession.setNote(OIDCLoginProtocol.ISSUER, RealmsResource.realmBaseUrl(uriInfo).build(realm.getName()).toString());
+
+        // Check if the home realm (whr) parameter was specified
+        String idpHint = params.getWsfed_home_realm();
+        if (idpHint != null && !"".equals(idpHint)) {
+            IdentityProviderModel identityProviderModel = realm.getIdentityProviderByAlias(idpHint);
+
+            if (identityProviderModel != null) {
+                return buildRedirectToIdentityProvider(idpHint, new ClientSessionCode(realm, clientSession).getCode());
+            }
+        }
 
         return newBrowserAuthentication(clientSession);
     }
