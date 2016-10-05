@@ -43,74 +43,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public class WSFedSAML2AssertionTypeBuilder {
-    public static final String WSFED_NAME_ID = "WSFED_NAME_ID";
-    public static final String WSFED_NAME_ID_FORMAT = "WSFED_NAME_ID_FORMAT";
-    public static final String SAML_NAME_ID_FORMAT_ATTRIBUTE = "saml_name_id_format";
-    public static final String SAML_DEFAULT_NAMEID_FORMAT = JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get();
-    public static final String SAML_FORCE_NAME_ID_FORMAT_ATTRIBUTE = "saml_force_name_id_format";
-    public static final String SAML_PERSISTENT_NAME_ID_FOR = "saml.persistent.name.id.for";
-
-    private UserSessionModel userSession;
-    private ClientSessionModel clientSession;
-    private ClientSessionCode accessCode;
-    private RealmModel realm;
-    private KeycloakSession session;
-    private UriInfo uriInfo;
-
-    public UserSessionModel getUserSession() {
-        return userSession;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setUserSession(UserSessionModel userSession) {
-        this.userSession = userSession;
-        return this;
-    }
-
-    public ClientSessionModel getClientSession() {
-        return clientSession;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setClientSession(ClientSessionModel clientSession) {
-        this.clientSession = clientSession;
-        return this;
-    }
-
-    public ClientSessionCode getAccessCode() {
-        return accessCode;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setAccessCode(ClientSessionCode accessCode) {
-        this.accessCode = accessCode;
-        return this;
-    }
-
-    public RealmModel getRealm() {
-        return realm;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setRealm(RealmModel realm) {
-        this.realm = realm;
-        return this;
-    }
-
-    public KeycloakSession getSession() {
-        return session;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setSession(KeycloakSession session) {
-        this.session = session;
-        return this;
-    }
-
-    public UriInfo getUriInfo() {
-        return uriInfo;
-    }
-
-    public WSFedSAML2AssertionTypeBuilder setUriInfo(UriInfo uriInfo) {
-        this.uriInfo = uriInfo;
-        return this;
-    }
+public class WSFedSAML2AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstractBuilder<WSFedSAML2AssertionTypeBuilder> {
 
     public AssertionType build() throws ConfigurationException, ProcessingException, DatatypeConfigurationException {
         String responseIssuer = getResponseIssuer(realm);
@@ -180,10 +113,6 @@ public class WSFedSAML2AssertionTypeBuilder {
         if(attributeStatement.getAttributes().size() > 0) {
             assertion.addStatement(attributeStatement);
         }
-    }
-
-    protected String getResponseIssuer(RealmModel realm) {
-        return RealmsResource.realmBaseUrl(uriInfo).build(realm.getName()).toString();
     }
 
     protected String getNameIdFormat(ClientSessionModel clientSession) {

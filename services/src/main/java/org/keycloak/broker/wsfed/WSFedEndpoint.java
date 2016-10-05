@@ -242,7 +242,7 @@ public class WSFedEndpoint {
                 token = new SAML2RequestedToken(wsfedResponse, rt, realm);
             }
             else if(rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:1.0:assertion")) == 0) {
-                throw new NotImplementedException("We don't currently support a token type of urn:oasis:names:tc:SAML:1.0:assertion");
+                token = new SAML11RequestedToken(wsfedResponse, rt, realm);
             }
             else if(rstr.getTokenType().compareTo(URI.create("urn:ietf:params:oauth:token-type:jwt")) == 0) {
                 throw new NotImplementedException("We don't currently support a token type of urn:ietf:params:oauth:token-type:jwt");
