@@ -16,6 +16,11 @@
 
 package org.keycloak.protocol.wsfed;
 
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
+import org.keycloak.protocol.wsfed.builders.WsFedSAML11AssertionTypeBuilder;
+import org.keycloak.saml.common.exceptions.ConfigurationException;
+import org.keycloak.saml.common.exceptions.ParsingException;
+import org.keycloak.saml.common.exceptions.ProcessingException;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
 import org.keycloak.protocol.wsfed.builders.WSFedOIDCAccessTokenBuilder;
@@ -45,6 +50,7 @@ import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+import javax.xml.datatype.DatatypeConfigurationException;
 import java.io.InputStream;
 import java.security.KeyPair;
 
@@ -57,6 +63,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
 
     public static final String WSFED_JWT = "wsfed.jwt";
     public static final String WSFED_X5T = "wsfed.x5t";
+    public static final String WSFED_SAML_ASSERTION_TOKEN_FORMAT = "wsfed.saml_assertion_token_format";
     public static final String WSFED_LOGOUT_BINDING_URI = "WSFED_LOGOUT_BINDING_URI";
     public static final String WSFED_CONTEXT = "WSFED_CONTEXT";
 
@@ -150,16 +157,15 @@ public class WSFedLoginProtocol implements LoginProtocol {
                 builder.setJwt(token);
             } else {
                 //if client wants SAML
-                WSFedSAML2AssertionTypeBuilder samlBuilder = new WSFedSAML2AssertionTypeBuilder();
-                samlBuilder.setRealm(realm)
-                            .setUriInfo(uriInfo)
-                            .setAccessCode(accessCode)
-                            .setClientSession(clientSession)
-                            .setUserSession(userSession)
-                            .setSession(session);
-
-                AssertionType token = samlBuilder.build();
-                builder.setSamlToken(token);
+                WsFedSAMLAssertionTokenFormat tokenFormat = getSamlAssertionTokenFormat(client);
+                switch(tokenFormat) {
+                    case SAML20_ASSERTION_TOKEN_FORMAT:
+                        buildSAML20AssertionToken(userSession, accessCode, clientSession, builder);
+                        break;
+                    case SAML11_ASSERTION_TOKEN_FORMAT:
+                        buildSAML11AssertionToken(userSession, accessCode, clientSession, builder);
+                        break;
+                }
             }
 
             return builder.buildResponse();
@@ -167,6 +173,30 @@ public class WSFedLoginProtocol implements LoginProtocol {
             logger.error("failed", e);
             return ErrorPage.error(session, Messages.FAILED_TO_PROCESS_RESPONSE);
         }
+    }
+
+    private void buildSAML11AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession, RequestSecurityTokenResponseBuilder builder) throws DatatypeConfigurationException, ConfigurationException, ProcessingException {
+        WsFedSAML11AssertionTypeBuilder samlBuilder = new WsFedSAML11AssertionTypeBuilder();
+        samlBuilder.setRealm(realm)
+                .setUriInfo(uriInfo)
+                .setAccessCode(accessCode)
+                .setClientSession(clientSession)
+                .setUserSession(userSession)
+                .setSession(session);
+        SAML11AssertionType token = samlBuilder.build();
+        builder.setSaml11Token(token);
+    }
+
+    private void buildSAML20AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession, RequestSecurityTokenResponseBuilder builder) throws ConfigurationException, ProcessingException, DatatypeConfigurationException {
+        WSFedSAML2AssertionTypeBuilder samlBuilder = new WSFedSAML2AssertionTypeBuilder();
+        samlBuilder.setRealm(realm)
+            .setUriInfo(uriInfo)
+            .setAccessCode(accessCode)
+            .setClientSession(clientSession)
+            .setUserSession(userSession)
+            .setSession(session);
+        AssertionType token = samlBuilder.build();
+        builder.setSamlToken(token);
     }
 
     @Override
@@ -181,6 +211,19 @@ public class WSFedLoginProtocol implements LoginProtocol {
 
     protected boolean isX5tIncluded(ClientModel client) {
         return Boolean.parseBoolean(client.getAttribute(WSFED_X5T));
+    }
+
+    protected WsFedSAMLAssertionTokenFormat getSamlAssertionTokenFormat(ClientModel client) {
+        String value = client.getAttribute(WSFED_SAML_ASSERTION_TOKEN_FORMAT);
+        try {
+            if (value != null)
+               return WsFedSAMLAssertionTokenFormat.parse(value);
+            return WsFedSAMLAssertionTokenFormat.SAML20_ASSERTION_TOKEN_FORMAT;
+        }
+        catch(RuntimeException ex) {
+            logger.error(ex.toString());
+        }
+        return WsFedSAMLAssertionTokenFormat.SAML20_ASSERTION_TOKEN_FORMAT;
     }
 
     //@Override

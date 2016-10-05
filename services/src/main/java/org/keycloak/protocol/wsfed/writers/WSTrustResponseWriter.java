@@ -17,6 +17,7 @@
  */
 package org.keycloak.protocol.wsfed.writers;
 
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
 import org.keycloak.dom.saml.v2.assertion.AssertionType;
 import org.keycloak.saml.common.ErrorCodes;
 import org.keycloak.saml.common.PicketLinkLogger;
@@ -25,6 +26,7 @@ import org.keycloak.saml.common.constants.WSTrustConstants;
 import org.keycloak.saml.common.exceptions.ProcessingException;
 import org.keycloak.saml.common.util.StaxUtil;
 import org.keycloak.saml.common.util.StringUtil;
+import org.keycloak.saml.processing.core.saml.v1.writers.SAML11AssertionWriter;
 import org.keycloak.saml.processing.core.saml.v2.writers.SAMLAssertionWriter;
 import org.picketlink.identity.federation.core.wstrust.wrappers.Lifetime;
 import org.picketlink.identity.federation.core.wstrust.wrappers.RequestSecurityTokenResponse;
@@ -188,6 +190,10 @@ public class WSTrustResponseWriter {
                     AssertionType assertion = (AssertionType) securityToken;
                     SAMLAssertionWriter samlAssertionWriter = new SAMLAssertionWriter(this.writer);
                     samlAssertionWriter.write(assertion);
+                } else if (securityToken instanceof SAML11AssertionType) {
+                    SAML11AssertionType assertion = (SAML11AssertionType)securityToken;
+                    SAML11AssertionWriter saml11AssertionWriter = new SAML11AssertionWriter(this.writer);
+                    saml11AssertionWriter.write(assertion);
                 } else if (securityToken instanceof Element) {
                     StaxUtil.writeDOMElement(this.writer, (Element) securityToken);
                 } else if (securityToken instanceof BinarySecurityTokenType) {

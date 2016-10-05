@@ -16,7 +16,12 @@
 
 package org.keycloak.protocol.wsfed.builders;
 
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
+import org.keycloak.protocol.wsfed.sig.SAML11Signature;
+import org.keycloak.protocol.wsfed.sig.SAML2SignatureProxy;
+import org.keycloak.protocol.wsfed.sig.SAMLAbstractSignature;
 import org.keycloak.protocol.wsfed.writers.WSTrustResponseWriter;
+import org.keycloak.saml.processing.core.saml.v1.SAML11Constants;
 import org.keycloak.wsfed.common.builders.WSFedResponseBuilder;
 import org.keycloak.dom.saml.v2.assertion.AssertionType;
 import org.keycloak.saml.SignatureAlgorithm;
@@ -57,6 +62,7 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
     protected int tokenExpiration;
     protected AssertionType samlToken;
     protected String jwt;
+    protected SAML11AssertionType saml11Token;
 
     protected SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.RSA_SHA256;
     protected KeyPair signingKeyPair;
@@ -89,11 +95,19 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
         return samlToken;
     }
 
+    public SAML11AssertionType getSaml11Token() {
+        return saml11Token;
+    }
+
     public RequestSecurityTokenResponseBuilder setSamlToken(AssertionType samlToken) {
         this.samlToken = samlToken;
         return this;
     }
 
+    public RequestSecurityTokenResponseBuilder setSaml11Token(SAML11AssertionType samlToken) {
+        this.saml11Token = samlToken;
+        return this;
+    }
     public String getJwt() {
         return jwt;
     }
@@ -177,7 +191,7 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
         if(samlToken != null) {
             //Sign token
             Document doc = AssertionUtil.asDocument(samlToken);
-            doc = signAssertion(doc);
+            doc = signAssertion(doc, new SAML2SignatureProxy());
 
             response.getRequestedSecurityToken().add(doc.getDocumentElement());
 
@@ -200,6 +214,15 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
             response.getRequestedSecurityToken().add(bstt);
             response.setTokenType(URI.create("urn:ietf:params:oauth:token-type:jwt"));
         }
+        else if (saml11Token != null) {
+            //Sign token
+            Document doc = AssertionUtil.asDocument(saml11Token);
+            doc = signAssertion(doc, new SAML11Signature());
+
+            response.getRequestedSecurityToken().add(doc.getDocumentElement());
+//            response.setKeyType(URI.create("http://schemas.xmlsoap.org/ws/2005/05/identity/NoProofKey"));
+            response.setTokenType(URI.create(SAML11Constants.ASSERTION_11_NSURI));
+        }
         else {
             throw new ConfigurationException("SAML or JWT must be set.");
         }
@@ -207,7 +230,7 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
         return response;
     }
 
-    protected Document signAssertion(Document samlDocument) throws ProcessingException {
+    protected Document signAssertion(Document samlDocument, SAMLAbstractSignature samlSignature) throws ProcessingException {
         Element originalAssertionElement = samlDocument.getDocumentElement(); //org.keycloak.saml.common.util.DocumentUtil.getChildElement(samlDocument.getDocumentElement(), new QName(JBossSAMLURIConstants.ASSERTION_NSURI.get(), JBossSAMLConstants.ASSERTION.get()));
 
         if (originalAssertionElement == null) return samlDocument;
@@ -223,15 +246,14 @@ public class RequestSecurityTokenResponseBuilder extends WSFedResponseBuilder {
         temporaryDocument.adoptNode(clonedAssertionElement);
         temporaryDocument.appendChild(clonedAssertionElement);
 
-        signDocument(temporaryDocument);
+        signDocument(temporaryDocument, samlSignature);
 
         return temporaryDocument;
     }
 
-    protected void signDocument(Document samlDocument) throws ProcessingException {
+    protected void signDocument(Document samlDocument, SAMLAbstractSignature samlSignature) throws ProcessingException {
         String signatureMethod = signatureAlgorithm.getXmlSignatureMethod();
         String signatureDigestMethod = signatureAlgorithm.getXmlSignatureDigestMethod();
-        SAML2Signature samlSignature = new SAML2Signature();
 
         if (signatureMethod != null) {
             samlSignature.setSignatureMethod(signatureMethod);

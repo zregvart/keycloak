@@ -19,7 +19,9 @@
 package org.keycloak.broker.wsfed;
 
 import org.keycloak.broker.provider.DefaultDataMarshaller;
+import org.keycloak.broker.wsfed.readers.SAML11RequestedTokenParser;
 import org.keycloak.broker.wsfed.readers.SAML2RequestedTokenParser;
+import org.keycloak.broker.wsfed.writers.SAML11RequestedTokenWriter;
 import org.keycloak.broker.wsfed.writers.SAML2RequestedTokenWriter;
 import org.keycloak.saml.common.exceptions.ParsingException;
 import org.keycloak.saml.common.exceptions.ProcessingException;
@@ -47,6 +49,10 @@ public class RSTDataMarshaller extends DefaultDataMarshaller {
                     SAML2RequestedToken requestedToken = (SAML2RequestedToken) obj;
                     SAML2RequestedTokenWriter writer = new SAML2RequestedTokenWriter(StaxUtil.getXMLStreamWriter(bos));
                     writer.write(requestedToken);
+                } else if (obj instanceof SAML11RequestedToken) {
+                    SAML11RequestedToken requestedToken = (SAML11RequestedToken) obj;
+                    SAML11RequestedTokenWriter writer = new SAML11RequestedTokenWriter(StaxUtil.getXMLStreamWriter(bos));
+                    writer.write(requestedToken);
                 } else {
                     throw new IllegalArgumentException("Don't know how to serialize object of type " + obj.getClass().getName());
                 }
@@ -69,6 +75,11 @@ public class RSTDataMarshaller extends DefaultDataMarshaller {
                     byte[] bytes = xmlString.getBytes();
                     InputStream is = new ByteArrayInputStream(bytes);
                     Object respType = new SAML2RequestedTokenParser().parse(is);
+                    return clazz.cast(respType);
+                } else if (clazz.equals(SAML11RequestedToken.class)) {
+                    byte[] bytes = xmlString.getBytes();
+                    InputStream is = new ByteArrayInputStream(bytes);
+                    Object respType = new SAML11RequestedTokenParser().parse(is);
                     return clazz.cast(respType);
                 } else {
                     throw new IllegalArgumentException("Don't know how to deserialize object of type " + clazz.getName());

@@ -148,43 +148,6 @@ public class SAML2RequestedToken implements RequestedToken {
         return null;
     }
 
-    private static Document createXmlDocument(String response) throws ProcessingException, ParserConfigurationException {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
-        DocumentBuilder builder = null;
-
-        builder = factory.newDocumentBuilder();
-        InputSource source = new InputSource();
-        source.setCharacterStream(new StringReader(response));
-        try {
-            Document document = builder.parse(source);
-            JAXPValidationUtil.checkSchemaValidation(document);
-            return document;
-        } catch (SAXException | IOException e) {
-            throw new ProcessingException("Error while extracting SAML from WSFed response.");
-        }
-    }
-
-    private Document extractSamlDocument(Document document) throws ProcessingException {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            XPath xpath = XPathFactory.newInstance().newXPath();
-            XPathExpression xPathExpression = xpath.compile("//*[local-name() = 'Assertion']");
-
-            NodeList samlNodes = (NodeList) xPathExpression.evaluate(document, XPathConstants.NODESET);
-            Document samlDoc = factory.newDocumentBuilder().newDocument();
-            for (int i = 0; i < samlNodes.getLength(); i++) {
-                Node node = samlNodes.item(i);
-                Node copyNode = samlDoc.importNode(node, true);
-                samlDoc.appendChild(copyNode);
-            }
-            return samlDoc;
-        } catch (XPathExpressionException | ParserConfigurationException e) {
-            throw new ProcessingException("Error while extracting SAML Assertion from WSFed XML document.");
-        }
-    }
-
     protected NameIDType getSubjectNameID() {
         if (subjectNameID == null) {
             SubjectType subject = saml2Assertion.getSubject();

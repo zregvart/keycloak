@@ -837,6 +837,10 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
         "transient",
         "persistent"
     ];
+    $scope.wsfedSamlAssertionTokenFormats = [
+        "SAML 2.0",
+        "SAML 1.1"
+    ];
 
     $scope.canonicalization = [
         {name: "EXCLUSIVE", value:  "http://www.w3.org/2001/10/xml-exc-c14n#"  },
@@ -859,6 +863,7 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
     $scope.realm = realm;
     $scope.wsfedJwt = false;
     $scope.wsfedX5t = false;
+    $scope.wsfedSamlAssertionTokenFormat = $scope.wsfedSamlAssertionTokenFormats[0];
     $scope.samlAuthnStatement = false;
     $scope.samlMultiValuedRoles = false;
     $scope.samlServerSignature = false;
@@ -916,6 +921,12 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
             } else {
                 $scope.wsfedX5t = false;
             }
+        }
+
+        if ($scope.client.attributes['wsfed.saml_assertion_token_format'] == 'SAML 2.0') {
+            $scope.wsfedSamlAssertionTokenFormat = $scope.wsfedSamlAssertionTokenFormats[0];
+        } else if ($scope.client.attributes['wsfed.saml_assertion_token_format'] == 'SAML 1.1') {
+            $scope.wsfedSamlAssertionTokenFormat = $scope.wsfedSamlAssertionTokenFormats[1];
         }
 
         if ($scope.client.attributes["saml.server.signature"]) {
@@ -1063,6 +1074,11 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
         }
     };
 
+    $scope.changeWsFedSamlAssertionTokenFormat = function() {
+        $scope.client.attributes['wsfed.saml_assertion_token_format'] = $scope.wsfedSamlAssertionTokenFormat;
+    };
+
+
     $scope.$watch(function() {
         return $location.path();
     }, function() {
@@ -1142,6 +1158,8 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
         } else {
             $scope.client.attributes["wsfed.x5t"] = "false";
         }
+
+        $scope.client.attributes['wsfed.saml_assertion_token_format'] = $scope.wsfedSamlAssertionTokenFormat;
 
         if ($scope.samlServerSignature == true) {
             $scope.client.attributes["saml.server.signature"] = "true";

@@ -39,6 +39,8 @@ import java.util.GregorianCalendar;
 public class SAML2AssertionTypeBuilder {
     protected static final Logger logger = Logger.getLogger(SAML2AssertionTypeBuilder.class);
 
+    private static final long CLOCK_SKEW = 2000;
+
     protected String requestID;
     protected String issuer;
     protected String requestIssuer;
@@ -103,13 +105,16 @@ public class SAML2AssertionTypeBuilder {
         AudienceRestrictionType audience = new AudienceRestrictionType();
         audience.addAudience(URI.create(requestIssuer));
         assertion.setConditions(new ConditionsType());
-        assertion.getConditions().setNotBefore(getXMLGregorianCalendarNow());
+
+        // Add a small time skew
+        XMLGregorianCalendar beforeInstant = XMLTimeUtil.subtract(getXMLGregorianCalendarNow(), CLOCK_SKEW);
+        assertion.getConditions().setNotBefore(beforeInstant);
         assertion.getConditions().addCondition(audience);
 
         //Update Conditions NotOnOrAfter
         if(assertionExpiration > 0) {
             ConditionsType conditions = assertion.getConditions();
-            conditions.setNotOnOrAfter(XMLTimeUtil.add(conditions.getNotBefore(), assertionExpiration * 1000));
+            conditions.setNotOnOrAfter(XMLTimeUtil.add(conditions.getNotBefore(), assertionExpiration * 1000 + CLOCK_SKEW));
         }
 
         //Update SubjectConfirmationData NotOnOrAfter

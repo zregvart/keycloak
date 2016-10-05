@@ -46,6 +46,7 @@ import org.keycloak.saml.common.util.StaxUtil;
 import org.keycloak.saml.processing.api.saml.v2.response.SAML2Response;
 import org.keycloak.saml.processing.api.saml.v2.sig.SAML2Signature;
 import org.keycloak.saml.processing.core.parsers.saml.SAMLParser;
+import org.keycloak.saml.processing.core.saml.v1.writers.SAML11AssertionWriter;
 import org.keycloak.saml.processing.core.saml.v2.writers.SAMLAssertionWriter;
 import org.keycloak.saml.processing.core.util.JAXPValidationUtil;
 import org.keycloak.saml.processing.core.util.XMLEncryptionUtil;
@@ -101,6 +102,28 @@ public class AssertionUtil {
     public static Document asDocument(AssertionType assertion) throws ProcessingException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         SAMLAssertionWriter writer = new SAMLAssertionWriter(StaxUtil.getXMLStreamWriter(baos));
+
+        writer.write(assertion);
+
+        try {
+            return DocumentUtil.getDocument(new ByteArrayInputStream(baos.toByteArray()));
+        } catch (Exception e) {
+            throw logger.processingError(e);
+        }
+    }
+
+    /**
+     * Given {@code AssertionType}, convert it into a DOM Document.
+     *
+     * @param assertion
+     *
+     * @return
+     *
+     * @throws ProcessingException
+     */
+    public static Document asDocument(SAML11AssertionType assertion) throws ProcessingException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        SAML11AssertionWriter writer = new SAML11AssertionWriter(StaxUtil.getXMLStreamWriter(baos));
 
         writer.write(assertion);
 
