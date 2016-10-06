@@ -21,7 +21,7 @@
     <parent>
         <artifactId>keycloak-distribution-parent</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>2.2.0-SNAPSHOT</version>
+        <version>2.3.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>keycloak-dist-downloads</artifactId>
@@ -111,12 +111,6 @@
                                     <artifactId>keycloak-examples-dist</artifactId>
                                     <type>zip</type>
                                     <destFileName>keycloak-examples-${project.version}.zip</destFileName>
-                                </artifactItem>
-                                <artifactItem>
-                                    <groupId>org.keycloak</groupId>
-                                    <artifactId>keycloak-src-dist</artifactId>
-                                    <type>zip</type>
-                                    <destFileName>keycloak-src-${project.version}.zip</destFileName>
                                 </artifactItem>
                             </artifactItems>
                             <outputDirectory>target/${project.version}</outputDirectory>
@@ -260,6 +254,17 @@
                                 <artifactItem>
                                     <groupId>org.keycloak</groupId>
                                     <artifactId>keycloak-wildfly-adapter-dist</artifactId>
+                                    <type>tar.gz</type>
+                                </artifactItem>
+
+                                <artifactItem>
+                                    <groupId>org.keycloak</groupId>
+                                    <artifactId>keycloak-fuse-adapter-dist</artifactId>
+                                    <type>zip</type>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.keycloak</groupId>
+                                    <artifactId>keycloak-fuse-adapter-dist</artifactId>
                                     <type>tar.gz</type>
                                 </artifactItem>
                             </artifactItems>

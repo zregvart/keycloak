@@ -16,9 +16,10 @@
  */
 package org.keycloak.testsuite.arquillian.migration;
 
-import java.lang.reflect.Method;
 import org.jboss.arquillian.test.spi.execution.ExecutionDecision;
 import org.jboss.arquillian.test.spi.execution.TestExecutionDecider;
+
+import java.lang.reflect.Method;
 
 /**
  * @author <a href="mailto:vramik@redhat.com">Vlastislav Ramik</a>
@@ -38,7 +39,7 @@ public class MigrationTestExecutionDecider implements TestExecutionDecider {
         if (migrationTest && migrationAnnotation != null) {
             String versionFrom = migrationAnnotation.versionFrom();
 
-            if (migratedAuthServerVersion.equals(versionFrom)) {
+            if (migratedAuthServerVersion.contains(versionFrom)) {
                 return ExecutionDecision.execute();
             } else {
                 return ExecutionDecision.dontExecute(method.getName() + "doesn't fit with migration version.");

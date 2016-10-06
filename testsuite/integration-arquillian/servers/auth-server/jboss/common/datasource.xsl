@@ -17,12 +17,8 @@
 
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                 xmlns:xalan="http://xml.apache.org/xalan"
-                xmlns:j="urn:jboss:domain:4.0"
-                xmlns:ds="urn:jboss:domain:datasources:4.0"
-                xmlns:k="urn:jboss:domain:keycloak:1.1"
-                xmlns:sec="urn:jboss:domain:security:1.2"
                 version="2.0"
-                exclude-result-prefixes="xalan j ds k sec">
+                exclude-result-prefixes="xalan">
 
     <xsl:output method="xml" version="1.0" encoding="UTF-8" indent="yes" xalan:indent-amount="4" standalone="no"/>
     <xsl:strip-space elements="*"/>
@@ -33,24 +29,42 @@
     <!-- Remove keycloak datasource definition. -->
     <xsl:template match="//*[local-name()='subsystem' and starts-with(namespace-uri(), $nsDS)]
 		         /*[local-name()='datasources' and starts-with(namespace-uri(), $nsDS)]
-                         /*[local-name()='datasource' and starts-with(namespace-uri(), $nsDS) and @pool-name='KeycloakDS']">
+                         /*[local-name()='xa-datasource' and starts-with(namespace-uri(), $nsDS) and @pool-name='KeycloakDS']">
     </xsl:template>
     
-    <xsl:param name="jdbc.url" select="'jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE'"/>
-    <xsl:param name="driver" select="'h2'"/>
+    <xsl:param name="db.jdbc_url"/>
+    <xsl:param name="db.hostname"/>
+    <xsl:param name="db.name"/>
+    <xsl:param name="db.port"/>
+    <xsl:param name="driver"/>
+    <xsl:param name="datasource.class.xa"/>
     
-    <xsl:param name="username" select="'sa'"/>
-    <xsl:param name="password" select="'sa'"/>
-    
-    <xsl:param name="min.poolsize" select="'10'"/>
-    <xsl:param name="max.poolsize" select="'50'"/>
-    <xsl:param name="pool.prefill" select="'true'"/>
+    <xsl:param name="username"/>
+    <xsl:param name="password"/>
     
     <xsl:variable name="newDatasourceDefinition">
-        <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" use-java-context="true">
-            <connection-url>
-                <xsl:value-of select="$jdbc.url"/>
-            </connection-url>
+        <xa-datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" use-java-context="true">
+            <xsl:choose>
+                <xsl:when test="contains($driver, 'oracle')">
+                    <xa-datasource-property name="URL">
+                        <xsl:value-of select="$db.jdbc_url"/>
+                    </xa-datasource-property>
+                </xsl:when>
+                <xsl:otherwise>
+                    <xa-datasource-property name="ServerName">
+                        <xsl:value-of select="$db.hostname"/>
+                    </xa-datasource-property>
+                    <xa-datasource-property name="PortNumber">
+                        <xsl:value-of select="$db.port"/>
+                    </xa-datasource-property>
+                    <xa-datasource-property name="DatabaseName">
+                        <xsl:value-of select="$db.name"/>
+                    </xa-datasource-property>
+                    <xsl:if test="contains($driver, 'db2')">
+                        <xa-datasource-property name="DriverType">4</xa-datasource-property>
+                    </xsl:if>
+                </xsl:otherwise>
+            </xsl:choose>
             <driver>
                 <xsl:value-of select="$driver"/>
             </driver>
@@ -62,23 +76,16 @@
                     <xsl:value-of select="$password"/>
                 </password>
             </security>
-            <pool>
-                <min-pool-size>
-                    <xsl:value-of select="$min.poolsize"/>
-                </min-pool-size>
-                <max-pool-size>
-                    <xsl:value-of select="$max.poolsize"/>
-                </max-pool-size>
-                <prefill>
-                    <xsl:value-of select="$pool.prefill"/>
-                </prefill>
-            </pool>
-        </datasource>
+        </xa-datasource>
     </xsl:variable>
     
     <xsl:variable name="newDriverDefinition">
         <xsl:if test="$driver != 'h2'">
-            <driver name="{$driver}" module="com.{$driver}" />
+            <driver name="{$driver}" module="com.{$driver}">
+                <xa-datasource-class>
+                    <xsl:value-of select="$datasource.class.xa"/>
+                </xa-datasource-class>
+            </driver>
         </xsl:if>
     </xsl:variable>
     

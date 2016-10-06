@@ -42,14 +42,14 @@
     <xsl:template match="//ds:datasources">
         <xsl:copy>
             <xsl:apply-templates select="node()[name(.)='datasource']"/>
-            <datasource jndi-name="java:jboss/datasources/KeycloakDS" jta="false" pool-name="KeycloakDS" use-java-context="true">
-                <connection-url>jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE</connection-url>
+            <xa-datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" use-java-context="true">
+                <xa-datasource-property name="URL">jdbc:h2:${jboss.server.data.dir}/keycloak;AUTO_SERVER=TRUE</xa-datasource-property>
                 <driver>h2</driver>
                 <security>
                     <user-name>sa</user-name>
                     <password>sa</password>
                 </security>
-            </datasource>
+            </xa-datasource>
             <xsl:apply-templates select="node()[name(.)='drivers']"/>
         </xsl:copy>
     </xsl:template>
@@ -89,6 +89,10 @@
                 <local-cache name="loginFailures"/>
                 <local-cache name="authorization"/>
                 <local-cache name="work"/>
+                <local-cache name="keys">
+                    <eviction max-entries="1000" strategy="LRU"/>
+                    <expiration max-idle="3600000" />
+                </local-cache>
             </cache-container>
             <xsl:apply-templates select="node()|@*"/>
         </xsl:copy>

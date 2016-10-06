@@ -18,7 +18,6 @@
 package org.keycloak.federation.ldap;
 
 import org.keycloak.models.ModelReadOnlyException;
-import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.UserModelDelegate;
 
@@ -48,14 +47,6 @@ public class ReadonlyLDAPUserModelDelegate extends UserModelDelegate implements 
     @Override
     public void setFirstName(String first) {
         throw new ModelReadOnlyException("Federated storage is not writable");
-    }
-
-    @Override
-    public void updateCredential(UserCredentialModel cred) {
-        if (provider.getSupportedCredentialTypes(delegate).contains(cred.getType())) {
-            throw new ModelReadOnlyException("Federated storage is not writable");
-        }
-        delegate.updateCredential(cred);
     }
 
     @Override

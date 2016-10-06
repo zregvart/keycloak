@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.keycloak.testsuite</groupId>
         <artifactId>integration-arquillian-tests</artifactId>
-        <version>2.2.0-SNAPSHOT</version>
+        <version>2.3.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>integration-arquillian-tests-other</artifactId>
@@ -38,8 +38,9 @@
 
     <modules>
         <module>adapters</module>
+        <module>sssd</module>
     </modules>
-    
+
     <build>
         <pluginManagement>
             <plugins>
@@ -65,7 +66,7 @@
                             </configuration>
                         </execution>
                     </executions>
-                </plugin> 
+                </plugin>
                 <plugin>
                     <artifactId>maven-resources-plugin</artifactId>
                     <executions>
@@ -139,6 +140,12 @@
             <id>jpa-performance</id>
             <modules>
                 <module>jpa-performance</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>nodejs-adapter-tests</id>
+            <modules>
+                <module>nodejs_adapter</module>
             </modules>
         </profile>
     </profiles>

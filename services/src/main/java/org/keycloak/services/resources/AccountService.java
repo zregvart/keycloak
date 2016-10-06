@@ -16,14 +16,16 @@
  */
 package org.keycloak.services.resources;
 
-import org.keycloak.events.Errors;
-import org.keycloak.forms.account.AccountPages;
-import org.keycloak.forms.account.AccountProvider;
+import org.keycloak.common.util.UriUtils;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.events.Details;
+import org.keycloak.events.Errors;
 import org.keycloak.events.Event;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.events.EventStoreProvider;
 import org.keycloak.events.EventType;
+import org.keycloak.forms.account.AccountPages;
+import org.keycloak.forms.account.AccountProvider;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.AccountRoles;
 import org.keycloak.models.ClientModel;
@@ -36,18 +38,13 @@ import org.keycloak.models.ModelException;
 import org.keycloak.models.ModelReadOnlyException;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
-import org.keycloak.models.UserFederationProvider;
-import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.CredentialValidation;
 import org.keycloak.models.utils.FormMessage;
-import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.ModelToRepresentation;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
-import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.services.ForbiddenException;
 import org.keycloak.services.ServicesLogger;
@@ -60,7 +57,6 @@ import org.keycloak.services.managers.UserSessionManager;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.services.util.ResolveRelative;
 import org.keycloak.services.validation.Validation;
-import org.keycloak.common.util.UriUtils;
 import org.keycloak.util.JsonSerialization;
 
 import javax.ws.rs.Consumes;
@@ -75,7 +71,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 import javax.ws.rs.core.Variant;
-
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -270,7 +265,7 @@ public class AccountService extends AbstractSecuredLocalService {
         } else if (types.contains(MediaType.APPLICATION_JSON_TYPE)) {
             requireOneOf(AccountRoles.MANAGE_ACCOUNT, AccountRoles.VIEW_PROFILE);
 
-            UserRepresentation rep = ModelToRepresentation.toRepresentation(auth.getUser());
+            UserRepresentation rep = ModelToRepresentation.toRepresentation(session, realm, auth.getUser());
             if (rep.getAttributes() != null) {
                 Iterator<String> itr = rep.getAttributes().keySet().iterator();
                 while (itr.hasNext()) {
@@ -444,7 +439,7 @@ public class AccountService extends AbstractSecuredLocalService {
         csrfCheck(stateChecker);
 
         UserModel user = auth.getUser();
-        user.setOtpEnabled(false);
+        session.userCredentialManager().disableCredential(realm, user, CredentialModel.OTP);
 
         event.event(EventType.REMOVE_TOTP).client(auth.getClient()).user(auth.getUser()).success();
 
@@ -564,15 +559,13 @@ public class AccountService extends AbstractSecuredLocalService {
         UserCredentialModel credentials = new UserCredentialModel();
         credentials.setType(realm.getOTPPolicy().getType());
         credentials.setValue(totpSecret);
-        session.users().updateCredential(realm, user, credentials);
-
-        user.setOtpEnabled(true);
+        session.userCredentialManager().updateCredential(realm, user, credentials);
 
         // to update counter
         UserCredentialModel cred = new UserCredentialModel();
         cred.setType(realm.getOTPPolicy().getType());
         cred.setValue(totp);
-        session.users().validCredentials(session, realm, user, cred);
+        session.userCredentialManager().isValid(realm, user, cred);
 
         event.event(EventType.UPDATE_TOTP).client(auth.getClient()).user(auth.getUser()).success();
 
@@ -624,7 +617,7 @@ public class AccountService extends AbstractSecuredLocalService {
             }
 
             UserCredentialModel cred = UserCredentialModel.password(password);
-            if (!session.users().validCredentials(session, realm, user, cred)) {
+            if (!session.userCredentialManager().isValid(realm, user, cred)) {
                 setReferrerOnPage();
                 errorEvent.error(Errors.INVALID_USER_CREDENTIALS);
                 return account.setError(Messages.INVALID_PASSWORD_EXISTING).createResponse(AccountPages.PASSWORD);
@@ -644,7 +637,7 @@ public class AccountService extends AbstractSecuredLocalService {
         }
 
         try {
-            session.users().updateCredential(realm, user, UserCredentialModel.password(passwordNew));
+            session.userCredentialManager().updateCredential(realm, user, UserCredentialModel.password(passwordNew));
         } catch (ModelReadOnlyException mre) {
             setReferrerOnPage();
             errorEvent.error(Errors.NOT_ALLOWED);
@@ -774,32 +767,7 @@ public class AccountService extends AbstractSecuredLocalService {
     }
 
     public static boolean isPasswordSet(KeycloakSession session, RealmModel realm, UserModel user) {
-        boolean passwordSet = false;
-
-        // See if password is set for user on linked UserFederationProvider
-        if (user.getFederationLink() != null) {
-
-            UserFederationProvider federationProvider = null;
-            for (UserFederationProviderModel fedProviderModel : realm.getUserFederationProviders()) {
-                if (fedProviderModel.getId().equals(user.getFederationLink())) {
-                    federationProvider = KeycloakModelUtils.getFederationProviderInstance(session, fedProviderModel);
-                }
-            }
-
-            if (federationProvider != null) {
-                Set<String> supportedCreds = federationProvider.getSupportedCredentialTypes(user);
-                if (supportedCreds.contains(UserCredentialModel.PASSWORD)) {
-                    passwordSet = true;
-                }
-            }
-        }
-
-        for (UserCredentialValueModel c : user.getCredentialsDirectly()) {
-            if (c.getType().equals(CredentialRepresentation.PASSWORD)) {
-                passwordSet = true;
-            }
-        }
-        return passwordSet;
+        return session.userCredentialManager().isConfiguredFor(realm, user, CredentialModel.PASSWORD);
     }
 
     private String[] getReferrer() {

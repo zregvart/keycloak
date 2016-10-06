@@ -17,23 +17,38 @@
 
 package org.keycloak.testsuite.rest;
 
-import java.io.File;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
 import org.infinispan.Cache;
+import org.jboss.resteasy.annotations.cache.NoCache;
+import org.jboss.resteasy.spi.BadRequestException;
 import org.keycloak.common.util.Time;
 import org.keycloak.connections.infinispan.InfinispanConnectionProvider;
 import org.keycloak.events.Event;
+import org.keycloak.events.EventQuery;
+import org.keycloak.events.EventStoreProvider;
+import org.keycloak.events.EventType;
 import org.keycloak.events.admin.AdminEvent;
+import org.keycloak.events.admin.AdminEventQuery;
+import org.keycloak.events.admin.AuthDetails;
+import org.keycloak.events.admin.OperationType;
 import org.keycloak.events.admin.ResourceType;
+import org.keycloak.models.AuthenticationFlowModel;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.RealmProvider;
+import org.keycloak.models.UserCredentialModel;
+import org.keycloak.models.UserFederationProvider;
+import org.keycloak.models.UserFederationProviderFactory;
+import org.keycloak.models.UserModel;
+import org.keycloak.models.UserProvider;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.ModelToRepresentation;
 import org.keycloak.representations.idm.AdminEventRepresentation;
+import org.keycloak.representations.idm.AuthDetailsRepresentation;
+import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
 import org.keycloak.representations.idm.EventRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.services.managers.ClientSessionCode;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.resource.RealmResourceProvider;
@@ -41,6 +56,8 @@ import org.keycloak.testsuite.events.EventsListenerProvider;
 import org.keycloak.testsuite.forms.PassThroughAuthenticator;
 import org.keycloak.testsuite.forms.PassThroughClientAuthenticator;
 import org.keycloak.testsuite.rest.representation.AuthenticatorState;
+import org.keycloak.testsuite.rest.resource.TestingExportImportResource;
+
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
@@ -52,32 +69,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.jboss.resteasy.annotations.cache.NoCache;
-import org.jboss.resteasy.spi.BadRequestException;
-import org.keycloak.events.EventQuery;
-import org.keycloak.events.EventStoreProvider;
-import org.keycloak.events.EventType;
-import org.keycloak.events.admin.AdminEventQuery;
-import org.keycloak.events.admin.AuthDetails;
-import org.keycloak.events.admin.OperationType;
-import org.keycloak.exportimport.ExportImportManager;
-import org.keycloak.models.AuthenticationFlowModel;
-import org.keycloak.models.ClientModel;
-import org.keycloak.models.FederatedIdentityModel;
-import org.keycloak.models.RealmProvider;
-import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserFederationProvider;
-import org.keycloak.models.UserFederationProviderFactory;
-import org.keycloak.models.UserModel;
-import org.keycloak.models.UserProvider;
-import org.keycloak.representations.idm.AuthDetailsRepresentation;
-import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
-import org.keycloak.representations.idm.UserRepresentation;
-
-import static org.keycloak.exportimport.ExportImportConfig.*;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -565,22 +563,6 @@ public class TestingResourceProvider implements RealmResourceProvider {
     }
 
     @GET
-    @Path("/run-import")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response runImport() {
-        new ExportImportManager(session).runImport();
-        return Response.ok().build();
-    }
-
-    @GET
-    @Path("/run-export")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response runExport() {
-        new ExportImportManager(session).runExport();
-        return Response.ok().build();
-    }
-
-    @GET
     @Path("/valid-credentials")
     @Produces(MediaType.APPLICATION_JSON)
     public boolean validCredentials(@QueryParam("realmName") String realmName, @QueryParam("userName") String userName, @QueryParam("password") String password) {
@@ -588,7 +570,7 @@ public class TestingResourceProvider implements RealmResourceProvider {
         if (realm == null) return false;
         UserProvider userProvider = session.getProvider(UserProvider.class);
         UserModel user = userProvider.getUserByUsername(userName, realm);
-        return userProvider.validCredentials(session, realm, user, UserCredentialModel.password(password));
+        return session.userCredentialManager().isValid(realm, user, UserCredentialModel.password(password));
     }
 
     @GET
@@ -601,7 +583,7 @@ public class TestingResourceProvider implements RealmResourceProvider {
         RealmModel realm = getRealmByName(realmName);
         UserModel foundFederatedUser = session.users().getUserByFederatedIdentity(new FederatedIdentityModel(identityProvider, userId, userName), realm);
         if (foundFederatedUser == null) return null;
-        return ModelToRepresentation.toRepresentation(foundFederatedUser);
+        return ModelToRepresentation.toRepresentation(session, realm, foundFederatedUser);
     }
 
     @GET
@@ -613,7 +595,7 @@ public class TestingResourceProvider implements RealmResourceProvider {
         UserFederationProviderFactory factory = (UserFederationProviderFactory)session.getKeycloakSessionFactory().getProviderFactory(UserFederationProvider.class, "dummy");
         UserModel user = factory.getInstance(session, null).getUserByUsername(realm, userName);
         if (user == null) return null;
-        return ModelToRepresentation.toRepresentation(user);
+        return ModelToRepresentation.toRepresentation(session, realm, user);
     }
 
     @GET
@@ -644,86 +626,17 @@ public class TestingResourceProvider implements RealmResourceProvider {
         ClientModel client =  realm.getClientByClientId(clientId);
         UserModel user = session.users().getServiceAccount(client);
         if (user == null) return null;
-        return ModelToRepresentation.toRepresentation(user);
+        return ModelToRepresentation.toRepresentation(session, realm, user);
+    }
+
+    @Path("/export-import")
+    public TestingExportImportResource getExportImportResource() {
+        return new TestingExportImportResource(session);
     }
 
     private RealmModel getRealmByName(String realmName) {
         RealmProvider realmProvider = session.getProvider(RealmProvider.class);
         return realmProvider.getRealmByName(realmName);
-    }
-
-    @GET
-    @Path("/get-users-per-file")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Integer getUsersPerFile() {
-        String usersPerFile = System.getProperty(USERS_PER_FILE, String.valueOf(DEFAULT_USERS_PER_FILE));
-        return Integer.parseInt(usersPerFile.trim());
-    }
-
-    @PUT
-    @Path("/set-users-per-file")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public void setUsersPerFile(@QueryParam("usersPerFile") Integer usersPerFile) {
-        System.setProperty(USERS_PER_FILE, String.valueOf(usersPerFile));
-    }
-
-    @GET
-    @Path("/get-dir")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public String getDir() {
-        return System.getProperty(DIR);
-    }
-
-    @PUT
-    @Path("/set-dir")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public String setDir(@QueryParam("dir") String dir) {
-        return System.setProperty(DIR, dir);
-    }
-
-    @PUT
-    @Path("/export-import-provider")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public void setProvider(@QueryParam("exportImportProvider") String exportImportProvider) {
-        System.setProperty(PROVIDER, exportImportProvider);
-    }
-
-    @PUT
-    @Path("/export-import-file")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public void setFile(@QueryParam("file") String file) {
-        System.setProperty(FILE, file);
-    }
-
-    @PUT
-    @Path("/export-import-action")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public void setAction(@QueryParam("exportImportAction") String exportImportAction) {
-        System.setProperty(ACTION, exportImportAction);
-    }
-
-    @PUT
-    @Path("/set-realm-name")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public void setRealmName(@QueryParam("realmName") String realmName) {
-        if (realmName != null && !realmName.isEmpty()) {
-            System.setProperty(REALM_NAME, realmName);
-        } else {
-            System.getProperties().remove(REALM_NAME);
-        }
-    }
-
-    @GET
-    @Path("/get-test-dir")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public String getExportImportTestDirectory() {
-        System.setProperty("project.build.directory", "target");
-        String absolutePath = new File(System.getProperty("project.build.directory", "target")).getAbsolutePath();
-        return absolutePath;
     }
 
 }

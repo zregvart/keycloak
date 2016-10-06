@@ -29,12 +29,12 @@ import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.oidc.mappers.AddressMapper;
 import org.keycloak.protocol.oidc.mappers.FullNameMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper;
+import org.keycloak.protocol.oidc.mappers.UserAttributeMapper;
 import org.keycloak.protocol.oidc.mappers.UserPropertyMapper;
 import org.keycloak.protocol.oidc.mappers.UserSessionNoteMapper;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientTemplateRepresentation;
 import org.keycloak.services.ServicesLogger;
-import org.keycloak.services.managers.AuthenticationManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,8 +42,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.keycloak.protocol.oidc.mappers.UserAttributeMapper;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>

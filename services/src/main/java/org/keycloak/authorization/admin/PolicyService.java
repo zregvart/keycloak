@@ -48,7 +48,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.keycloak.models.utils.ModelToRepresentation.toRepresentation;
@@ -273,7 +272,7 @@ public class PolicyService {
     @Path("evaluate")
     public PolicyEvaluationService getPolicyEvaluateResource() {
         this.auth.requireView();
-        PolicyEvaluationService resource = new PolicyEvaluationService(this.resourceServer, this.authorization);
+        PolicyEvaluationService resource = new PolicyEvaluationService(this.resourceServer, this.authorization, this.auth);
 
         ResteasyProviderFactory.getInstance().injectProperties(resource);
 

@@ -30,7 +30,6 @@ import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
-
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -76,8 +75,6 @@ public class UserEntity {
     protected String email;
     @Column(name = "ENABLED")
     protected boolean enabled;
-    @Column(name = "TOTP")
-    protected boolean totp;
     @Column(name = "EMAIL_VERIFIED")
     protected boolean emailVerified;
 
@@ -166,14 +163,6 @@ public class UserEntity {
 
     public void setEmailConstraint(String emailConstraint) {
         this.emailConstraint = emailConstraint;
-    }
-
-    public boolean isTotp() {
-        return totp;
-    }
-
-    public void setTotp(boolean totp) {
-        this.totp = totp;
     }
 
     public boolean isEmailVerified() {

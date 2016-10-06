@@ -34,7 +34,26 @@ import org.keycloak.saml.BaseSAML2BindingBuilder;
 import org.keycloak.saml.SAML2ErrorResponseBuilder;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.testsuite.adapter.AbstractServletsAdapterTest;
-import org.keycloak.testsuite.adapter.page.*;
+import org.keycloak.testsuite.adapter.page.BadAssertionSalesPostSig;
+import org.keycloak.testsuite.adapter.page.BadClientSalesPostSigServlet;
+import org.keycloak.testsuite.adapter.page.BadRealmSalesPostSigServlet;
+import org.keycloak.testsuite.adapter.page.Employee2Servlet;
+import org.keycloak.testsuite.adapter.page.EmployeeServlet;
+import org.keycloak.testsuite.adapter.page.EmployeeSigFrontServlet;
+import org.keycloak.testsuite.adapter.page.EmployeeSigServlet;
+import org.keycloak.testsuite.adapter.page.InputPortal;
+import org.keycloak.testsuite.adapter.page.MissingAssertionSig;
+import org.keycloak.testsuite.adapter.page.SAMLServlet;
+import org.keycloak.testsuite.adapter.page.SalesMetadataServlet;
+import org.keycloak.testsuite.adapter.page.SalesPost2Servlet;
+import org.keycloak.testsuite.adapter.page.SalesPostAssertionAndResponseSig;
+import org.keycloak.testsuite.adapter.page.SalesPostEncServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostPassiveServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostSigEmailServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostSigPersistentServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostSigServlet;
+import org.keycloak.testsuite.adapter.page.SalesPostSigTransientServlet;
 import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.auth.page.login.Login;
 import org.keycloak.testsuite.auth.page.login.SAMLIDPInitiatedLogin;
@@ -56,7 +75,9 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.keycloak.testsuite.auth.page.AuthRealm.SAMLSERVLETDEMO;
-import static org.keycloak.testsuite.util.IOUtil.*;
+import static org.keycloak.testsuite.util.IOUtil.loadRealm;
+import static org.keycloak.testsuite.util.IOUtil.loadXML;
+import static org.keycloak.testsuite.util.IOUtil.modifyDocElementAttribute;
 import static org.keycloak.testsuite.util.URLAssert.assertCurrentUrlStartsWith;
 import static org.keycloak.testsuite.util.WaitUtils.waitUntilElement;
 
@@ -327,8 +348,7 @@ public abstract class AbstractSAMLServletsAdapterTest extends AbstractServletsAd
 
         salesPostPassiveServletPage.navigateTo();
         if (forbiddenIfNotAuthenticated) {
-            waitUntilElement(By.xpath("//body")).text().not().contains("principal=");
-            assertTrue(driver.getPageSource().contains("Forbidden") || driver.getPageSource().contains(FORBIDDEN_TEXT));
+            assertOnForbiddenPage();
         } else {
             waitUntilElement(By.xpath("//body")).text().contains("principal=null");
         }
@@ -407,9 +427,7 @@ public abstract class AbstractSAMLServletsAdapterTest extends AbstractServletsAd
         salesPostPassiveServletPage.navigateTo();
 
         if (forbiddenIfNotAuthenticated) {
-            waitUntilElement(By.xpath("//body")).text().not().contains("principal=");
-            //Different 403 status page on EAP and Wildfly
-            assertTrue(driver.getPageSource().contains("Forbidden") || driver.getPageSource().contains(FORBIDDEN_TEXT));
+            assertOnForbiddenPage();
         } else {
             waitUntilElement(By.xpath("//body")).text().contains("principal=null");
         }
@@ -422,9 +440,7 @@ public abstract class AbstractSAMLServletsAdapterTest extends AbstractServletsAd
         salesPostPassiveServletPage.navigateTo();
 
         if (forbiddenIfNotAuthenticated) {
-            waitUntilElement(By.xpath("//body")).text().not().contains("principal=");
-            //Different 403 status page on EAP and Wildfly
-            assertTrue(driver.getPageSource().contains("Forbidden") || driver.getPageSource().contains(FORBIDDEN_TEXT));
+            assertOnForbiddenPage();
         } else {
             waitUntilElement(By.xpath("//body")).text().contains("principal=null");
         }
@@ -723,5 +739,17 @@ public abstract class AbstractSAMLServletsAdapterTest extends AbstractServletsAd
         testRealmSAMLPostLoginPage.form().login(bburkeUser);
         driver.navigate().to(employee2ServletPage.toString() + "/setCheckRoles?roles=" + roles);
         employee2ServletPage.logout();
+    }
+
+    private void assertOnForbiddenPage() {
+        switch (System.getProperty("app.server")) {
+            case "eap6":
+                waitUntilElement(By.xpath("//body")).text().not().contains("principal=");
+                String source = driver.getPageSource();
+                assertTrue(source.isEmpty() || source.contains("<body></body>"));
+                break;
+            default:
+                waitUntilElement(By.xpath("//body")).text().contains(FORBIDDEN_TEXT);
+        }
     }
 }

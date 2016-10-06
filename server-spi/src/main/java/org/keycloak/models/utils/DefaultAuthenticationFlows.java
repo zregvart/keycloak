@@ -17,17 +17,17 @@
 
 package org.keycloak.models.utils;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredCredentialModel;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
+
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -276,6 +276,7 @@ public class DefaultAuthenticationFlows {
         execution.setAuthenticatorFlow(false);
         realm.addAuthenticatorExecution(execution);
 
+        addIdentityProviderAuthenticator(realm, null);
 
         AuthenticationFlowModel forms = new AuthenticationFlowModel();
         forms.setTopLevel(false);
@@ -315,6 +316,45 @@ public class DefaultAuthenticationFlows {
         execution.setPriority(20);
         execution.setAuthenticatorFlow(false);
         realm.addAuthenticatorExecution(execution);
+    }
+
+    public static void addIdentityProviderAuthenticator(RealmModel realm, String defaultProvider) {
+        String browserFlowId = null;
+        for (AuthenticationFlowModel f : realm.getAuthenticationFlows()) {
+            if (f.getAlias().equals(DefaultAuthenticationFlows.BROWSER_FLOW)) {
+                browserFlowId = f.getId();
+                break;
+            }
+        }
+
+        if (browserFlowId != null) {
+            for (AuthenticationExecutionModel e : realm.getAuthenticationExecutions(browserFlowId)) {
+                if ("identity-provider-redirector".equals(e.getAuthenticator())) {
+                    return;
+                }
+            }
+
+            AuthenticationExecutionModel execution;
+            execution = new AuthenticationExecutionModel();
+            execution.setParentFlow(browserFlowId);
+            execution.setRequirement(AuthenticationExecutionModel.Requirement.ALTERNATIVE);
+            execution.setAuthenticator("identity-provider-redirector");
+            execution.setPriority(25);
+            execution.setAuthenticatorFlow(false);
+
+            if (defaultProvider != null) {
+                AuthenticatorConfigModel configModel = new AuthenticatorConfigModel();
+
+                Map<String, String> config = new HashMap<>();
+                config.put("defaultProvider", defaultProvider);
+                configModel.setConfig(config);
+                configModel = realm.addAuthenticatorConfig(configModel);
+
+                execution.setAuthenticatorConfig(configModel.getId());
+            }
+
+            realm.addAuthenticatorExecution(execution);
+        }
     }
 
     public static void clientAuthFlow(RealmModel realm) {

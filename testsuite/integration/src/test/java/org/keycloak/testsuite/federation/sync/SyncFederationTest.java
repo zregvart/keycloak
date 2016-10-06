@@ -17,10 +17,6 @@
 
 package org.keycloak.testsuite.federation.sync;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
 import org.jboss.logging.Logger;
 import org.junit.Assert;
 import org.junit.ClassRule;
@@ -36,9 +32,13 @@ import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserFederationSyncResult;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.managers.UsersSyncManager;
-import org.keycloak.testsuite.DummyUserFederationProviderFactory;
+import org.keycloak.testsuite.federation.DummyUserFederationProviderFactory;
 import org.keycloak.testsuite.rule.KeycloakRule;
 import org.keycloak.timer.TimerProvider;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test with Dummy providers (For LDAP see {@link org.keycloak.testsuite.federation.ldap.base.LDAPSyncTest}

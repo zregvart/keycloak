@@ -21,7 +21,7 @@
     <parent>
         <artifactId>keycloak-testsuite-pom</artifactId>
         <groupId>org.keycloak</groupId>
-        <version>2.2.0-SNAPSHOT</version>
+        <version>2.3.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -166,6 +166,14 @@
             <groupId>org.keycloak</groupId>
             <artifactId>federation-properties-example</artifactId>
         </dependency>
+
+        <!-- Dependency on services from integration-arquillian -->
+        <dependency>
+            <groupId>org.keycloak.testsuite</groupId>
+            <artifactId>integration-arquillian-testsuite-providers</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.jboss.logging</groupId>
             <artifactId>jboss-logging</artifactId>
@@ -451,6 +459,7 @@
                                     <systemPropertyVariables>
                                         <keycloak.realm.provider>mongo</keycloak.realm.provider>
                                         <keycloak.user.provider>mongo</keycloak.user.provider>
+                                        <keycloak.userFederatedStorage.provider>mongo</keycloak.userFederatedStorage.provider>
                                         <keycloak.userSessionPersister.provider>mongo</keycloak.userSessionPersister.provider>
                                         <keycloak.eventsStore.provider>mongo</keycloak.eventsStore.provider>
                                         <keycloak.authorization.provider>mongo</keycloak.authorization.provider>
@@ -469,6 +478,51 @@
                             </execution>
                         </executions>
                     </plugin>
+
+                    <!-- Embedded mongo -->
+                    <plugin>
+                        <groupId>com.github.joelittlejohn.embedmongo</groupId>
+                        <artifactId>embedmongo-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>start-mongodb</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                                <configuration>
+                                    <port>${keycloak.connectionsMongo.port}</port>
+                                    <logging>file</logging>
+                                    <logFile>${project.build.directory}/mongodb.log</logFile>
+                                    <bindIp>${keycloak.connectionsMongo.bindIp}</bindIp>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>stop-mongodb</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+
+        </profile>
+
+        <profile>
+            <id>mongodb-server</id>
+
+            <properties>
+                <keycloak.connectionsMongo.host>localhost</keycloak.connectionsMongo.host>
+                <keycloak.connectionsMongo.port>27018</keycloak.connectionsMongo.port>
+                <keycloak.connectionsMongo.db>keycloak</keycloak.connectionsMongo.db>
+                <keycloak.connectionsMongo.bindIp>127.0.0.1</keycloak.connectionsMongo.bindIp>
+            </properties>
+
+            <build>
+                <plugins>
 
                     <!-- Embedded mongo -->
                     <plugin>

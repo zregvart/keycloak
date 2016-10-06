@@ -18,9 +18,10 @@ package org.keycloak.services.resources.admin;
 
 import org.jboss.resteasy.annotations.cache.NoCache;
 import org.jboss.resteasy.spi.BadRequestException;
-import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
 import org.keycloak.authorization.admin.AuthorizationService;
+import org.keycloak.common.Profile;
+import org.keycloak.common.util.Time;
 import org.keycloak.events.admin.OperationType;
 import org.keycloak.events.admin.ResourceType;
 import org.keycloak.models.ClientModel;
@@ -40,18 +41,23 @@ import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.representations.idm.UserSessionRepresentation;
+import org.keycloak.services.ErrorResponse;
+import org.keycloak.services.ErrorResponseException;
 import org.keycloak.services.ServicesLogger;
 import org.keycloak.services.clientregistration.ClientRegistrationTokenUtils;
 import org.keycloak.services.managers.ClientManager;
 import org.keycloak.services.managers.RealmManager;
 import org.keycloak.services.managers.ResourceAdminManager;
 import org.keycloak.services.resources.KeycloakApplication;
-import org.keycloak.services.ErrorResponse;
-import org.keycloak.common.util.Time;
+import org.keycloak.services.validation.ClientValidator;
+import org.keycloak.services.validation.PairwiseClientValidator;
+import org.keycloak.services.validation.ValidationMessages;
+import org.keycloak.utils.ProfileHelper;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -62,11 +68,11 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import static java.lang.Boolean.TRUE;
 
@@ -107,7 +113,7 @@ public class ClientResource {
 
     @Path("protocol-mappers")
     public ProtocolMappersResource getProtocolMappers() {
-        ProtocolMappersResource mappers = new ProtocolMappersResource(client, auth, adminEvent);
+        ProtocolMappersResource mappers = new ProtocolMappersResource(realm, client, auth, adminEvent);
         ResteasyProviderFactory.getInstance().injectProperties(mappers);
         return mappers;
     }
@@ -126,6 +132,16 @@ public class ClientResource {
             throw new NotFoundException("Could not find client");
         }
 
+        ValidationMessages validationMessages = new ValidationMessages();
+        if (!ClientValidator.validate(rep, validationMessages) || !PairwiseClientValidator.validate(session, rep, validationMessages)) {
+            Properties messages = AdminRoot.getMessages(session, realm, auth.getAuth().getToken().getLocale());
+            throw new ErrorResponseException(
+                    validationMessages.getStringMessages(),
+                    validationMessages.getStringMessages(messages),
+                    Response.Status.BAD_REQUEST
+            );
+        }
+
         try {
             updateClientFromRep(rep, client, session);
             adminEvent.operation(OperationType.UPDATE).resourcePath(uriInfo).representation(rep).success();
@@ -142,10 +158,12 @@ public class ClientResource {
 
         RepresentationToModel.updateClient(rep, client);
 
-        if (TRUE.equals(rep.getAuthorizationServicesEnabled())) {
-            authorization().enable();
-        } else {
-            authorization().disable();
+        if (Profile.isPreviewEnabled()) {
+            if (TRUE.equals(rep.getAuthorizationServicesEnabled())) {
+                authorization().enable();
+            } else {
+                authorization().disable();
+            }
         }
     }
 
@@ -166,7 +184,9 @@ public class ClientResource {
 
         ClientRepresentation representation = ModelToRepresentation.toRepresentation(client);
 
-        representation.setAuthorizationServicesEnabled(authorization().isEnabled());
+        if (Profile.isPreviewEnabled()) {
+            representation.setAuthorizationServicesEnabled(authorization().isEnabled());
+        }
 
         return representation;
     }
@@ -326,7 +346,7 @@ public class ClientResource {
             }
         }
 
-        return ModelToRepresentation.toRepresentation(user);
+        return ModelToRepresentation.toRepresentation(session, realm, user);
     }
 
     /**
@@ -551,6 +571,8 @@ public class ClientResource {
 
     @Path("/authz")
     public AuthorizationService authorization() {
+        ProfileHelper.requirePreview();
+
         AuthorizationService resource = new AuthorizationService(this.session, this.client, this.auth);
 
         ResteasyProviderFactory.getInstance().injectProperties(resource);

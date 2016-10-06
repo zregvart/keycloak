@@ -17,6 +17,7 @@
 
 package org.keycloak.examples.federation.properties;
 
+import org.keycloak.credential.CredentialInput;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserFederationProviderModel;
@@ -98,6 +99,13 @@ public class FilePropertiesFederationProvider extends BasePropertiesFederationPr
         }
     }
 
+    @Override
+    public boolean updateCredential(RealmModel realm, UserModel user, CredentialInput input) {
+        return false;
+    }
 
+    @Override
+    public void disableCredentialType(RealmModel realm, UserModel user, String credentialType) {
 
+    }
 }

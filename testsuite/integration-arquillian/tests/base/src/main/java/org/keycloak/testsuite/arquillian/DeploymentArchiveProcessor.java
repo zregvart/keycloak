@@ -38,9 +38,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.keycloak.testsuite.arquillian.AppServerTestEnricher.*;
+import static org.keycloak.testsuite.arquillian.AppServerTestEnricher.hasAppServerContainerAnnotation;
+import static org.keycloak.testsuite.arquillian.AppServerTestEnricher.isRelative;
+import static org.keycloak.testsuite.arquillian.AppServerTestEnricher.isTomcatAppServer;
 import static org.keycloak.testsuite.arquillian.AuthServerTestEnricher.getAuthServerContextRoot;
-import static org.keycloak.testsuite.util.IOUtil.*;
+import static org.keycloak.testsuite.util.IOUtil.appendChildInDocument;
+import static org.keycloak.testsuite.util.IOUtil.documentToString;
+import static org.keycloak.testsuite.util.IOUtil.getElementTextContent;
+import static org.keycloak.testsuite.util.IOUtil.loadJson;
+import static org.keycloak.testsuite.util.IOUtil.loadXML;
+import static org.keycloak.testsuite.util.IOUtil.modifyDocElementAttribute;
+import static org.keycloak.testsuite.util.IOUtil.modifyDocElementValue;
+import static org.keycloak.testsuite.util.IOUtil.removeElementFromDoc;
 
 ;
 
@@ -48,8 +57,6 @@ import static org.keycloak.testsuite.util.IOUtil.*;
  * @author tkyjovsk
  */
 public class DeploymentArchiveProcessor implements ApplicationArchiveProcessor {
-
-    public static final String REALM_KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCrVrCuTtArbgaZzL1hvh0xtL5mc7o0NqPVnYXkLvgcwiC3BjLGw1tGEGoJaXDuSaRllobm53JBhjx33UNv+5z/UMG4kytBWxheNVKnL6GgqlNabMaFfPLPCF8kAgKnsi79NMo+n6KnSY8YeUmec/p2vjO2NjsSAVcWEQMVhJ31LwIDAQAB";
 
     protected final Logger log = org.jboss.logging.Logger.getLogger(this.getClass());
 
@@ -129,7 +136,6 @@ public class DeploymentArchiveProcessor implements ApplicationArchiveProcessor {
 //                ac.setRealmKey(null); // TODO verify if realm key is required for relative scneario
                     } else {
                         adapterConfig.setAuthServerUrl(getAuthServerContextRoot() + "/auth");
-                        adapterConfig.setRealmKey(REALM_KEY);
                     }
 
                     if ("true".equals(System.getProperty("app.server.ssl.required"))) {

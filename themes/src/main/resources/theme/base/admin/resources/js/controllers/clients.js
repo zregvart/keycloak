@@ -124,12 +124,53 @@ module.controller('ClientSecretCtrl', function($scope, $location, ClientSecret, 
     };
 });
 
-module.controller('ClientSignedJWTCtrl', function($scope, $location, ClientCertificate) {
+module.controller('ClientSignedJWTCtrl', function($scope, $location, Client, ClientCertificate, Notifications, $route) {
     var signingKeyInfo = ClientCertificate.get({ realm : $scope.realm.realm, client : $scope.client.id, attribute: 'jwt.credential' },
         function() {
             $scope.signingKeyInfo = signingKeyInfo;
         }
     );
+
+    console.log('ClientSignedJWTCtrl invoked');
+
+    $scope.clientCopy = angular.copy($scope.client);
+    $scope.changed = false;
+
+    $scope.$watch('client', function() {
+        if (!angular.equals($scope.client, $scope.clientCopy)) {
+            $scope.changed = true;
+        }
+    }, true);
+
+    if ($scope.client.attributes["use.jwks.url"]) {
+        if ($scope.client.attributes["use.jwks.url"] == "true") {
+            $scope.useJwksUrl = true;
+        } else {
+            $scope.useJwksUrl = false;
+        }
+    }
+
+    $scope.switchChange = function() {
+        $scope.changed = true;
+    }
+
+    $scope.save = function() {
+
+        if ($scope.useJwksUrl == true) {
+            $scope.client.attributes["use.jwks.url"] = "true";
+        } else {
+            $scope.client.attributes["use.jwks.url"] = "false";
+        }
+
+        Client.update({
+            realm : $scope.realm.realm,
+            client : $scope.client.id
+        }, $scope.client, function() {
+            $scope.changed = false;
+            $scope.clientCopy = angular.copy($scope.client);
+            Notifications.success("Client authentication configuration has been saved to the client.");
+        });
+    };
 
     $scope.importCertificate = function() {
         $location.url("/realms/" + $scope.realm.realm + "/clients/" + $scope.client.id + "/credentials/client-jwt/Signing/import/jwt.credential");
@@ -139,8 +180,8 @@ module.controller('ClientSignedJWTCtrl', function($scope, $location, ClientCerti
         $location.url("/realms/" + $scope.realm.realm + "/clients/" + $scope.client.id + "/credentials/client-jwt/Signing/export/jwt.credential");
     };
 
-    $scope.cancel = function() {
-        $location.url("/realms/" + $scope.realm.realm + "/clients/" + $scope.client.id + "/credentials");
+    $scope.reset = function() {
+        $route.reload();
     };
 });
 
@@ -365,11 +406,12 @@ module.controller('ClientCertificateImportCtrl', function($scope, $location, $ht
     ];
 
     if (callingContext == 'jwt-credentials') {
-        $scope.keyFormats.push('JSON Web Key Set (JWK)');
+        $scope.keyFormats.push('Public Key PEM');
+        $scope.keyFormats.push('JSON Web Key Set');
     }
 
     $scope.hideKeystoreSettings = function() {
-        return $scope.uploadKeyFormat == 'Certificate PEM' || $scope.uploadKeyFormat == 'JSON Web Key Set (JWK)';
+        return $scope.uploadKeyFormat == 'Certificate PEM' || $scope.uploadKeyFormat == 'Public Key PEM' || $scope.uploadKeyFormat == 'JSON Web Key Set';
     }
 
     $scope.uploadKeyFormat = $scope.keyFormats[0];
@@ -791,6 +833,17 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
         {name: "INCLUSIVE_WITH_COMMENTS", value: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments"}
     ];
 
+    $scope.oidcSignatureAlgorithms = [
+        "unsigned",
+        "RS256"
+    ];
+
+    $scope.requestObjectSignatureAlgorithms = [
+        "any",
+        "none",
+        "RS256"
+    ];
+
     $scope.realm = realm;
     $scope.samlAuthnStatement = false;
     $scope.samlMultiValuedRoles = false;
@@ -800,6 +853,7 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
     $scope.samlEncrypt = false;
     $scope.samlForcePostBinding = false;
     $scope.samlForceNameIdFormat = false;
+    $scope.disableAuthorizationTab = !client.authorizationServicesEnabled;
 
     function updateProperties() {
         if (!$scope.client.attributes) {
@@ -891,6 +945,12 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
                 $scope.samlForcePostBinding = false;
             }
         }
+
+        var attrVal1 = $scope.client.attributes['user.info.response.signature.alg'];
+        $scope.userInfoSignedResponseAlg = attrVal1==null ? 'unsigned' : attrVal1;
+
+        var attrVal2 = $scope.client.attributes['request.object.signature.alg'];
+         $scope.requestObjectSignatureAlg = attrVal2==null ? 'any' : attrVal2;
     }
 
     if (!$scope.create) {
@@ -953,6 +1013,22 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
 
     $scope.changeNameIdFormat = function() {
         $scope.client.attributes['saml_name_id_format'] = $scope.nameIdFormat;
+    };
+
+    $scope.changeUserInfoSignedResponseAlg = function() {
+        if ($scope.userInfoSignedResponseAlg === 'unsigned') {
+            $scope.client.attributes['user.info.response.signature.alg'] = null;
+        } else {
+            $scope.client.attributes['user.info.response.signature.alg'] = $scope.userInfoSignedResponseAlg;
+        }
+    };
+
+    $scope.changeRequestObjectSignatureAlg = function() {
+        if ($scope.requestObjectSignatureAlg === 'any') {
+            $scope.client.attributes['request.object.signature.alg'] = null;
+        } else {
+            $scope.client.attributes['request.object.signature.alg'] = $scope.requestObjectSignatureAlg;
+        }
     };
 
     $scope.$watch(function() {
@@ -1084,6 +1160,12 @@ module.controller('ClientDetailCtrl', function($scope, realm, client, templates,
             }, $scope.client, function() {
                 $route.reload();
                 Notifications.success("Your changes have been saved to the client.");
+            }, function(error) {
+                if (error.status == 400 && error.data.error_description) {
+                    Notifications.error(error.data.error_description);
+                } else {
+                    Notifications.error('Unexpected error when updating client');
+                }
             });
         }
     };
@@ -1198,6 +1280,12 @@ module.controller('CreateClientCtrl', function($scope, realm, client, templates,
             var id = l.substring(l.lastIndexOf("/") + 1);
             $location.url("/realms/" + realm.realm + "/clients/" + id);
             Notifications.success("The client has been created.");
+        }, function(error) {
+            if (error.status == 400 && error.data.error_description) {
+                Notifications.error(error.data.error_description);
+            } else {
+                Notifications.error('Unexpected error when creating client');
+            }
         });
     };
 
@@ -1656,6 +1744,12 @@ module.controller('ClientProtocolMapperCtrl', function($scope, realm, serverInfo
             mapper = angular.copy($scope.mapper);
             $location.url("/realms/" + realm.realm + '/clients/' + client.id + "/mappers/" + $scope.model.mapper.id);
             Notifications.success("Your changes have been saved.");
+        }, function(error) {
+            if (error.status == 400 && error.data.error_description) {
+                Notifications.error(error.data.error_description);
+            } else {
+                Notifications.error('Unexpected error when updating protocol mapper');
+            }
         });
     };
 
@@ -1721,6 +1815,12 @@ module.controller('ClientProtocolMapperCreateCtrl', function($scope, realm, serv
             var id = l.substring(l.lastIndexOf("/") + 1);
             $location.url("/realms/" + realm.realm + '/clients/' + client.id + "/mappers/" + id);
             Notifications.success("Mapper has been created.");
+        }, function(error) {
+            if (error.status == 400 && error.data.error_description) {
+                Notifications.error(error.data.error_description);
+            } else {
+                Notifications.error('Unexpected error when updating protocol mapper');
+            }
         });
     };
 

@@ -19,10 +19,7 @@ package org.keycloak.models.utils;
 
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.GroupModel;
-import org.keycloak.models.UserConsentModel;
 import org.keycloak.models.RoleModel;
-import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserModel;
 
 import java.util.List;
@@ -58,11 +55,6 @@ public class UserModelDelegate implements UserModel {
     @Override
     public boolean isEnabled() {
         return delegate.isEnabled();
-    }
-
-    @Override
-    public boolean isOtpEnabled() {
-        return delegate.isOtpEnabled();
     }
 
     @Override
@@ -163,26 +155,6 @@ public class UserModelDelegate implements UserModel {
     @Override
     public void setEmailVerified(boolean verified) {
         delegate.setEmailVerified(verified);
-    }
-
-    @Override
-    public void setOtpEnabled(boolean totp) {
-        delegate.setOtpEnabled(totp);
-    }
-
-    @Override
-    public void updateCredential(UserCredentialModel cred) {
-        delegate.updateCredential(cred);
-    }
-
-    @Override
-    public List<UserCredentialValueModel> getCredentialsDirectly() {
-        return delegate.getCredentialsDirectly();
-    }
-
-    @Override
-    public void updateCredentialDirectly(UserCredentialValueModel cred) {
-        delegate.updateCredentialDirectly(cred);
     }
 
     @Override

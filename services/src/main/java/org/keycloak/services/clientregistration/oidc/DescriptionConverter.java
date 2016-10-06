@@ -24,17 +24,25 @@ import org.keycloak.authentication.authenticators.client.ClientIdAndSecretAuthen
 import org.keycloak.authentication.authenticators.client.JWTClientAuthenticator;
 import org.keycloak.jose.jwk.JSONWebKeySet;
 import org.keycloak.jose.jwk.JWK;
+import org.keycloak.jose.jwk.JWKParser;
+import org.keycloak.jose.jws.Algorithm;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.protocol.oidc.OIDCAdvancedConfigWrapper;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
+import org.keycloak.protocol.oidc.mappers.PairwiseSubMapperHelper;
 import org.keycloak.protocol.oidc.utils.AuthorizeClientUtil;
-import org.keycloak.protocol.oidc.utils.JWKSUtils;
+import org.keycloak.protocol.oidc.utils.JWKSHttpUtils;
 import org.keycloak.protocol.oidc.utils.OIDCResponseType;
+import org.keycloak.protocol.oidc.utils.PairwiseSubMapperUtils;
+import org.keycloak.protocol.oidc.utils.SubjectType;
 import org.keycloak.representations.idm.CertificateRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.oidc.OIDCClientRepresentation;
 import org.keycloak.services.clientregistration.ClientRegistrationException;
 import org.keycloak.services.util.CertificateInfoHelper;
+import org.keycloak.util.JWKSUtils;
 
 import java.io.IOException;
 import java.net.URI;
@@ -51,6 +59,7 @@ public class DescriptionConverter {
 
     public static ClientRepresentation toInternal(KeycloakSession session, OIDCClientRepresentation clientOIDC) throws ClientRegistrationException {
         ClientRepresentation client = new ClientRepresentation();
+
         client.setClientId(clientOIDC.getClientId());
         client.setName(clientOIDC.getClientName());
         client.setRedirectUris(clientOIDC.getRedirectUris());
@@ -87,46 +96,59 @@ public class DescriptionConverter {
         }
         client.setClientAuthenticatorType(clientAuthFactory.getId());
 
-        // Externalize to ClientAuthenticator itself?
-        if (authMethod != null && authMethod.equals(OIDCLoginProtocol.PRIVATE_KEY_JWT)) {
+        boolean publicKeySet = setPublicKey(clientOIDC, client);
+        if (authMethod != null && authMethod.equals(OIDCLoginProtocol.PRIVATE_KEY_JWT) && !publicKeySet) {
+            throw new ClientRegistrationException("Didn't find key of supported keyType for use " + JWK.Use.SIG.asString());
+        }
 
-            PublicKey publicKey = retrievePublicKey(clientOIDC);
-            if (publicKey == null) {
-                throw new ClientRegistrationException("Didn't find key of supported keyType for use " + JWK.Use.SIG.asString());
-            }
+        OIDCAdvancedConfigWrapper configWrapper = OIDCAdvancedConfigWrapper.fromClientRepresentation(client);
+        if (clientOIDC.getUserinfoSignedResponseAlg() != null) {
+            Algorithm algorithm = Enum.valueOf(Algorithm.class, clientOIDC.getUserinfoSignedResponseAlg());
+            configWrapper.setUserInfoSignedResponseAlg(algorithm);
+        }
 
-            String publicKeyPem = KeycloakModelUtils.getPemFromKey(publicKey);
-
-            CertificateRepresentation rep = new CertificateRepresentation();
-            rep.setPublicKey(publicKeyPem);
-            CertificateInfoHelper.updateClientRepresentationCertificateInfo(client, rep, JWTClientAuthenticator.ATTR_PREFIX);
+        if (clientOIDC.getRequestObjectSigningAlg() != null) {
+            Algorithm algorithm = Enum.valueOf(Algorithm.class, clientOIDC.getRequestObjectSigningAlg());
+            configWrapper.setRequestObjectSignatureAlg(algorithm);
         }
 
         return client;
     }
 
 
-    private static PublicKey retrievePublicKey(OIDCClientRepresentation clientOIDC) {
+    private static boolean setPublicKey(OIDCClientRepresentation clientOIDC, ClientRepresentation clientRep) {
         if (clientOIDC.getJwksUri() == null && clientOIDC.getJwks() == null) {
-            throw new ClientRegistrationException("Requested client authentication method '%s' but jwks_uri nor jwks were available in config");
+            return false;
         }
 
         if (clientOIDC.getJwksUri() != null && clientOIDC.getJwks() != null) {
             throw new ClientRegistrationException("Illegal to use both jwks_uri and jwks");
         }
 
-        JSONWebKeySet keySet;
-        if (clientOIDC.getJwks() != null) {
-            keySet = clientOIDC.getJwks();
-        } else {
-            try {
-                keySet = JWKSUtils.sendJwksRequest(clientOIDC.getJwksUri());
-            } catch (IOException ioe) {
-                throw new ClientRegistrationException("Failed to send JWKS request to specified jwks_uri", ioe);
-            }
-        }
+        OIDCAdvancedConfigWrapper configWrapper = OIDCAdvancedConfigWrapper.fromClientRepresentation(clientRep);
 
-        return JWKSUtils.getKeyForUse(keySet, JWK.Use.SIG);
+        if (clientOIDC.getJwks() != null) {
+            JSONWebKeySet keySet = clientOIDC.getJwks();
+            JWK publicKeyJWk = JWKSUtils.getKeyForUse(keySet, JWK.Use.SIG);
+            if (publicKeyJWk == null) {
+                return false;
+            } else {
+                PublicKey publicKey = JWKParser.create(publicKeyJWk).toPublicKey();
+                String publicKeyPem = KeycloakModelUtils.getPemFromKey(publicKey);
+                CertificateRepresentation rep = new CertificateRepresentation();
+                rep.setPublicKey(publicKeyPem);
+                rep.setKid(publicKeyJWk.getKeyId());
+                CertificateInfoHelper.updateClientRepresentationCertificateInfo(clientRep, rep, JWTClientAuthenticator.ATTR_PREFIX);
+
+                configWrapper.setUseJwksUrl(false);
+
+                return true;
+            }
+        } else {
+            configWrapper.setUseJwksUrl(true);
+            configWrapper.setJwksUrl(clientOIDC.getJwksUri());
+            return true;
+        }
     }
 
 
@@ -152,6 +174,27 @@ public class DescriptionConverter {
         response.setRegistrationClientUri(uri.toString());
         response.setResponseTypes(getOIDCResponseTypes(client));
         response.setGrantTypes(getOIDCGrantTypes(client));
+
+        OIDCAdvancedConfigWrapper config = OIDCAdvancedConfigWrapper.fromClientRepresentation(client);
+        if (config.isUserInfoSignatureRequired()) {
+            response.setUserinfoSignedResponseAlg(config.getUserInfoSignedResponseAlg().toString());
+        }
+        if (config.getRequestObjectSignatureAlg() != null) {
+            response.setRequestObjectSigningAlg(config.getRequestObjectSignatureAlg().toString());
+        }
+        if (config.isUseJwksUrl()) {
+            response.setJwksUri(config.getJwksUrl());
+        }
+
+        List<ProtocolMapperRepresentation> foundPairwiseMappers = PairwiseSubMapperUtils.getPairwiseSubMappers(client);
+        SubjectType subjectType = foundPairwiseMappers.isEmpty() ? SubjectType.PUBLIC : SubjectType.PAIRWISE;
+        response.setSubjectType(subjectType.toString().toLowerCase());
+        if (subjectType.equals(SubjectType.PAIRWISE)) {
+            // Get sectorIdentifier from 1st found
+            String sectorIdentifierUri = PairwiseSubMapperHelper.getSectorIdentifierUri(foundPairwiseMappers.get(0));
+            response.setSectorIdentifierUri(sectorIdentifierUri);
+        }
+
         return response;
     }
 

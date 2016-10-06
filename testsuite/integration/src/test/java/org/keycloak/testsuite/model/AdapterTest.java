@@ -23,6 +23,7 @@ import org.junit.Test;
 import org.junit.runners.MethodSorters;
 import org.keycloak.Config;
 import org.keycloak.component.ComponentModel;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.ModelDuplicateException;
@@ -31,7 +32,6 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredCredentialModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserProvider;
@@ -164,13 +164,14 @@ public class AdapterTest extends AbstractModelTest {
         UserCredentialModel cred = new UserCredentialModel();
         cred.setType(CredentialRepresentation.PASSWORD);
         cred.setValue("geheim");
-        user.updateCredential(cred);
-        Assert.assertTrue(userProvider.validCredentials(session, realmModel, user, UserCredentialModel.password("geheim")));
-        List<UserCredentialValueModel> creds = user.getCredentialsDirectly();
+        realmManager.getSession().userCredentialManager().updateCredential(realmModel, user, cred);
+        Assert.assertTrue(realmManager.getSession().userCredentialManager().isValid(realmModel, user, UserCredentialModel.password("geheim")));
+        List<CredentialModel> creds = realmManager.getSession().userCredentialManager().getStoredCredentialsByType(realmModel, user, CredentialModel.PASSWORD);
+
         Assert.assertEquals(creds.get(0).getHashIterations(), 20000);
         realmModel.setPasswordPolicy(PasswordPolicy.parse(realmManager.getSession(), "hashIterations(200)"));
-        Assert.assertTrue(userProvider.validCredentials(session, realmModel, user, UserCredentialModel.password("geheim")));
-        creds = user.getCredentialsDirectly();
+        Assert.assertTrue(realmManager.getSession().userCredentialManager().isValid(realmModel, user, UserCredentialModel.password("geheim")));
+        creds = realmManager.getSession().userCredentialManager().getStoredCredentialsByType(realmModel, user, CredentialModel.PASSWORD);
         Assert.assertEquals(creds.get(0).getHashIterations(), 200);
         realmModel.setPasswordPolicy(PasswordPolicy.parse(realmManager.getSession(), "hashIterations(1)"));
     }
@@ -196,8 +197,7 @@ public class AdapterTest extends AbstractModelTest {
         UserCredentialModel cred = new UserCredentialModel();
         cred.setType(CredentialRepresentation.PASSWORD);
         cred.setValue("password");
-        user.updateCredential(cred);
-
+        realmManager.getSession().userCredentialManager().updateCredential(realmModel, user, cred);
         commit();
 
         realmModel = model.getRealm("JUGGLER");
@@ -237,7 +237,7 @@ public class AdapterTest extends AbstractModelTest {
         UserCredentialModel cred = new UserCredentialModel();
         cred.setType(CredentialRepresentation.PASSWORD);
         cred.setValue("password");
-        user.updateCredential(cred);
+        realmManager.getSession().userCredentialManager().updateCredential(realmModel, user, cred);
 
         ClientModel client = realmModel.addClient("client");
 

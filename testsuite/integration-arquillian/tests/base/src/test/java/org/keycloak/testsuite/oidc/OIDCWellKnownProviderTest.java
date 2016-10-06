@@ -17,15 +17,6 @@
 
 package org.keycloak.testsuite.oidc;
 
-import java.net.URI;
-import java.util.List;
-
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.keycloak.OAuth2Constants;
@@ -36,12 +27,22 @@ import org.keycloak.protocol.oidc.representations.OIDCConfigurationRepresentatio
 import org.keycloak.protocol.oidc.utils.OIDCResponseType;
 import org.keycloak.representations.IDToken;
 import org.keycloak.representations.idm.RealmRepresentation;
+import org.keycloak.services.clientregistration.ClientRegistrationService;
+import org.keycloak.services.clientregistration.oidc.OIDCClientRegistrationProviderFactory;
 import org.keycloak.services.resources.RealmsResource;
 import org.keycloak.testsuite.AbstractKeycloakTest;
 import org.keycloak.testsuite.Assert;
 import org.keycloak.testsuite.admin.AbstractAdminTest;
 import org.keycloak.testsuite.util.ClientManager;
 import org.keycloak.testsuite.util.OAuthClient;
+
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriBuilder;
+import java.net.URI;
+import java.util.List;
 
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
@@ -79,13 +80,24 @@ public class OIDCWellKnownProviderTest extends AbstractKeycloakTest {
             Assert.assertEquals(oidcConfig.getUserinfoEndpoint(), OIDCLoginProtocolService.userInfoUrl(UriBuilder.fromUri(OAuthClient.AUTH_SERVER_ROOT)).build("test").toString());
             Assert.assertEquals(oidcConfig.getJwksUri(), oauth.getCertsUrl("test"));
 
+            String registrationUri = UriBuilder
+                    .fromUri(OAuthClient.AUTH_SERVER_ROOT)
+                    .path(RealmsResource.class)
+                    .path(RealmsResource.class, "getClientsService")
+                    .path(ClientRegistrationService.class, "provider")
+                    .build("test", OIDCClientRegistrationProviderFactory.ID)
+                    .toString();
+            Assert.assertEquals(oidcConfig.getRegistrationEndpoint(), registrationUri);
+
             // Support standard + implicit + hybrid flow
             assertContains(oidcConfig.getResponseTypesSupported(), OAuth2Constants.CODE, OIDCResponseType.ID_TOKEN, "id_token token", "code id_token", "code token", "code id_token token");
             assertContains(oidcConfig.getGrantTypesSupported(), OAuth2Constants.AUTHORIZATION_CODE, OAuth2Constants.IMPLICIT);
             assertContains(oidcConfig.getResponseModesSupported(), "query", "fragment");
 
-            Assert.assertNames(oidcConfig.getSubjectTypesSupported(), "public");
+            Assert.assertNames(oidcConfig.getSubjectTypesSupported(), "pairwise", "public");
             Assert.assertNames(oidcConfig.getIdTokenSigningAlgValuesSupported(), Algorithm.RS256.toString());
+            Assert.assertNames(oidcConfig.getUserInfoSigningAlgValuesSupported(), Algorithm.RS256.toString());
+            Assert.assertNames(oidcConfig.getRequestObjectSigningAlgValuesSupported(), Algorithm.none.toString(), Algorithm.RS256.toString());
 
             // Client authentication
             Assert.assertNames(oidcConfig.getTokenEndpointAuthMethodsSupported(), "client_secret_basic", "client_secret_post", "private_key_jwt");
@@ -100,8 +112,8 @@ public class OIDCWellKnownProviderTest extends AbstractKeycloakTest {
             Assert.assertNames(oidcConfig.getScopesSupported(), OAuth2Constants.SCOPE_OPENID, OAuth2Constants.OFFLINE_ACCESS);
 
             // Request and Request_Uri
-            Assert.assertFalse(oidcConfig.getRequestParameterSupported());
-            Assert.assertFalse(oidcConfig.getRequestUriParameterSupported());
+            Assert.assertTrue(oidcConfig.getRequestParameterSupported());
+            Assert.assertTrue(oidcConfig.getRequestUriParameterSupported());
         } finally {
             client.close();
         }

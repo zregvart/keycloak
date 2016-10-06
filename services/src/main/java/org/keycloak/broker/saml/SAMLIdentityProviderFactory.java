@@ -24,6 +24,7 @@ import org.keycloak.dom.saml.v2.metadata.IDPSSODescriptorType;
 import org.keycloak.dom.saml.v2.metadata.KeyDescriptorType;
 import org.keycloak.dom.saml.v2.metadata.KeyTypes;
 import org.keycloak.models.IdentityProviderModel;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.saml.common.exceptions.ParsingException;
 import org.keycloak.saml.common.util.DocumentUtil;
@@ -49,12 +50,12 @@ public class SAMLIdentityProviderFactory extends AbstractIdentityProviderFactory
     }
 
     @Override
-    public SAMLIdentityProvider create(IdentityProviderModel model) {
-        return new SAMLIdentityProvider(new SAMLIdentityProviderConfig(model));
+    public SAMLIdentityProvider create(KeycloakSession session, IdentityProviderModel model) {
+        return new SAMLIdentityProvider(session, new SAMLIdentityProviderConfig(model));
     }
 
     @Override
-    public Map<String, String> parseConfig(InputStream inputStream) {
+    public Map<String, String> parseConfig(KeycloakSession session, InputStream inputStream) {
         try {
             Object parsedObject = new SAMLParser().parse(inputStream);
             EntityDescriptorType entityType;

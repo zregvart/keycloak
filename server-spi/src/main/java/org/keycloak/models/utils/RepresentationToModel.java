@@ -17,6 +17,7 @@
 
 package org.keycloak.models.utils;
 
+import org.jboss.logging.Logger;
 import org.keycloak.authorization.AuthorizationProvider;
 import org.keycloak.authorization.AuthorizationProviderFactory;
 import org.keycloak.authorization.model.Policy;
@@ -28,22 +29,22 @@ import org.keycloak.authorization.store.ResourceServerStore;
 import org.keycloak.authorization.store.ResourceStore;
 import org.keycloak.authorization.store.ScopeStore;
 import org.keycloak.authorization.store.StoreFactory;
-import org.keycloak.common.util.MultivaluedHashMap;
-import org.keycloak.component.ComponentModel;
-import org.keycloak.hash.Pbkdf2PasswordHashProvider;
-import org.keycloak.migration.migrators.MigrationUtils;
-import org.keycloak.models.ClientTemplateModel;
-import org.keycloak.models.Constants;
-import org.keycloak.common.util.Base64;
-import org.jboss.logging.Logger;
 import org.keycloak.common.enums.SslRequired;
+import org.keycloak.common.util.Base64;
+import org.keycloak.common.util.MultivaluedHashMap;
+import org.keycloak.common.util.UriUtils;
+import org.keycloak.component.ComponentModel;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.migration.MigrationProvider;
+import org.keycloak.migration.migrators.MigrationUtils;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.AuthenticatorConfigModel;
 import org.keycloak.models.BrowserSecurityHeaders;
 import org.keycloak.models.ClaimMask;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientTemplateModel;
+import org.keycloak.models.Constants;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.IdentityProviderMapperModel;
@@ -59,11 +60,9 @@ import org.keycloak.models.RoleModel;
 import org.keycloak.models.ScopeContainerModel;
 import org.keycloak.models.UserConsentModel;
 import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
-import org.keycloak.common.util.UriUtils;
 import org.keycloak.representations.idm.ApplicationRepresentation;
 import org.keycloak.representations.idm.AuthenticationExecutionExportRepresentation;
 import org.keycloak.representations.idm.AuthenticationExecutionRepresentation;
@@ -373,6 +372,15 @@ public class RepresentationToModel {
         if(rep.getDefaultLocale() != null){
             newRealm.setDefaultLocale(rep.getDefaultLocale());
         }
+        
+        // import attributes
+
+        if (rep.getAttributes() != null) {
+            for (Map.Entry<String, String> attr : rep.getAttributes().entrySet()) {
+                newRealm.setAttribute(attr.getKey(), attr.getValue());
+            }
+        }
+
     }
 
     protected static void importComponents(RealmModel newRealm, MultivaluedHashMap<String, ComponentExportRepresentation> components, String parentId) {
@@ -556,6 +564,19 @@ public class RepresentationToModel {
         if (newRealm.getFlowByAlias(DefaultAuthenticationFlows.FIRST_BROKER_LOGIN_FLOW) == null) {
             DefaultAuthenticationFlows.firstBrokerLoginFlow(newRealm, true);
         }
+
+        // Added in 2.2
+        String defaultProvider = null;
+        if (rep.getIdentityProviders() != null) {
+            for (IdentityProviderRepresentation i : rep.getIdentityProviders()) {
+                if (i.isEnabled() && i.isAuthenticateByDefault()) {
+                    defaultProvider = i.getProviderId();
+                    break;
+                }
+            }
+        }
+
+        DefaultAuthenticationFlows.addIdentityProviderAuthenticator(newRealm, defaultProvider);
     }
 
     private static void convertDeprecatedSocialProviders(RealmRepresentation rep) {
@@ -719,6 +740,21 @@ public class RepresentationToModel {
         if (rep.getRealm() != null) {
             renameRealm(realm, rep.getRealm());
         }
+
+        // Import attributes first, so the stuff saved directly on representation (displayName, bruteForce etc) has bigger priority
+        if (rep.getAttributes() != null) {
+            Set<String> attrsToRemove = new HashSet<>(realm.getAttributes().keySet());
+            attrsToRemove.removeAll(rep.getAttributes().keySet());
+
+            for (Map.Entry<String, String> entry : rep.getAttributes().entrySet()) {
+                realm.setAttribute(entry.getKey(), entry.getValue());
+            }
+
+            for (String attr : attrsToRemove) {
+                realm.removeAttribute(attr);
+            }
+        }
+
         if (rep.getDisplayName() != null) realm.setDisplayName(rep.getDisplayName());
         if (rep.getDisplayNameHtml() != null) realm.setDisplayNameHtml(rep.getDisplayNameHtml());
         if (rep.isEnabled() != null) realm.setEnabled(rep.isEnabled());
@@ -783,7 +819,7 @@ public class RepresentationToModel {
             realm.setUserFederationProviders(providerModels);
         }
 
-        if ("GENERATE".equals(rep.getPublicKey())) {
+        if (Constants.GENERATE.equals(rep.getPublicKey())) {
             KeycloakModelUtils.generateRealmKeys(realm);
         } else {
             if (rep.getPrivateKey() != null && rep.getPublicKey() != null) {
@@ -1004,6 +1040,8 @@ public class RepresentationToModel {
             client.updateDefaultRoles(resourceRep.getDefaultRoles());
         }
 
+
+
         if (resourceRep.getProtocolMappers() != null) {
             // first, remove all default/built in mappers
             Set<ProtocolMapperModel> mappers = client.getProtocolMappers();
@@ -1012,6 +1050,9 @@ public class RepresentationToModel {
             for (ProtocolMapperRepresentation mapper : resourceRep.getProtocolMappers()) {
                 client.addProtocolMapper(toModel(mapper));
             }
+
+
+
         }
 
         if (resourceRep.getClientTemplate() != null) {
@@ -1306,7 +1347,6 @@ public class RepresentationToModel {
         user.setFirstName(userRep.getFirstName());
         user.setLastName(userRep.getLastName());
         user.setFederationLink(userRep.getFederationLink());
-        if (userRep.isTotp() != null) user.setOtpEnabled(userRep.isTotp());
         if (userRep.getAttributes() != null) {
             for (Map.Entry<String, Object> entry : userRep.getAttributes().entrySet()) {
                 Object value = entry.getValue();
@@ -1326,7 +1366,7 @@ public class RepresentationToModel {
                 user.addRequiredAction(UserModel.RequiredAction.valueOf(requiredAction));
             }
         }
-        createCredentials(userRep, user);
+        createCredentials(userRep, session, newRealm, user);
         if (userRep.getFederatedIdentities() != null) {
             for (FederatedIdentityRepresentation identity : userRep.getFederatedIdentities()) {
                 FederatedIdentityModel mappingModel = new FederatedIdentityModel(identity.getIdentityProvider(), identity.getUserId(), identity.getUserName());
@@ -1361,21 +1401,21 @@ public class RepresentationToModel {
         return user;
     }
 
-    public static void createCredentials(UserRepresentation userRep, UserModel user) {
+    public static void createCredentials(UserRepresentation userRep, KeycloakSession session, RealmModel realm,UserModel user) {
         if (userRep.getCredentials() != null) {
             for (CredentialRepresentation cred : userRep.getCredentials()) {
-                updateCredential(user, cred);
+                updateCredential(session, realm, user, cred);
             }
         }
     }
 
     // Detect if it is "plain-text" or "hashed" representation and update model according to it
-    private static void updateCredential(UserModel user, CredentialRepresentation cred) {
+    private static void updateCredential(KeycloakSession session, RealmModel realm, UserModel user, CredentialRepresentation cred) {
         if (cred.getValue() != null) {
             UserCredentialModel plainTextCred = convertCredential(cred);
-            user.updateCredential(plainTextCred);
+            session.userCredentialManager().updateCredential(realm, user, plainTextCred);
         } else {
-            UserCredentialValueModel hashedCred = new UserCredentialValueModel();
+            CredentialModel hashedCred = new CredentialModel();
             hashedCred.setType(cred.getType());
             hashedCred.setDevice(cred.getDevice());
             if (cred.getHashIterations() != null) hashedCred.setHashIterations(cred.getHashIterations());
@@ -1393,14 +1433,14 @@ public class RepresentationToModel {
                 // Could happen when migrating from some early version
                 if ((UserCredentialModel.PASSWORD.equals(cred.getType()) || UserCredentialModel.PASSWORD_HISTORY.equals(cred.getType())) &&
                         (cred.getAlgorithm().equals(HmacOTP.HMAC_SHA1))) {
-                    hashedCred.setAlgorithm(Pbkdf2PasswordHashProvider.ID);
+                    hashedCred.setAlgorithm("pbkdf2");
                 } else {
                     hashedCred.setAlgorithm(cred.getAlgorithm());
                 }
 
             } else {
                 if (UserCredentialModel.PASSWORD.equals(cred.getType()) || UserCredentialModel.PASSWORD_HISTORY.equals(cred.getType())) {
-                    hashedCred.setAlgorithm(Pbkdf2PasswordHashProvider.ID);
+                    hashedCred.setAlgorithm("pbkdf2");
                 } else if (UserCredentialModel.isOtp(cred.getType())) {
                     hashedCred.setAlgorithm(HmacOTP.HMAC_SHA1);
                 }
@@ -1414,7 +1454,7 @@ public class RepresentationToModel {
                 hashedCred.setPeriod(30);
             }
             hashedCred.setCreatedDate(cred.getCreatedDate());
-            user.updateCredentialDirectly(hashedCred);
+            session.userCredentialManager().createCredential(realm, user, hashedCred);
         }
     }
 
@@ -1482,6 +1522,7 @@ public class RepresentationToModel {
 
         identityProviderModel.setInternalId(representation.getInternalId());
         identityProviderModel.setAlias(representation.getAlias());
+        identityProviderModel.setDisplayName(representation.getDisplayName());
         identityProviderModel.setProviderId(representation.getProviderId());
         identityProviderModel.setEnabled(representation.isEnabled());
         identityProviderModel.setTrustEmail(representation.isTrustEmail());

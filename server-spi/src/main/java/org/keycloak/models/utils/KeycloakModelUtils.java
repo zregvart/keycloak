@@ -18,7 +18,11 @@
 package org.keycloak.models.utils;
 
 import org.bouncycastle.openssl.PEMWriter;
+import org.keycloak.broker.social.SocialIdentityProvider;
+import org.keycloak.broker.social.SocialIdentityProviderFactory;
 import org.keycloak.common.util.Base64Url;
+import org.keycloak.common.util.CertificateUtils;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.ClientModel;
@@ -42,10 +46,12 @@ import org.keycloak.models.UserFederationProviderFactory;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.representations.idm.CertificateRepresentation;
-import org.keycloak.common.util.CertificateUtils;
-import org.keycloak.common.util.PemUtils;
+import org.keycloak.transaction.JtaTransactionManagerLookup;
 
 import javax.crypto.spec.SecretKeySpec;
+import javax.transaction.InvalidTransactionException;
+import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.security.Key;
@@ -302,6 +308,7 @@ public final class KeycloakModelUtils {
             session.close();
         }
     }
+
 
     public static String getMasterRealmAdminApplicationClientId(String realmName) {
         return realmName + "-realm";
@@ -651,4 +658,50 @@ public final class KeycloakModelUtils {
             }
         }
     }
+
+    public static void suspendJtaTransaction(KeycloakSessionFactory factory, Runnable runnable) {
+        JtaTransactionManagerLookup lookup = (JtaTransactionManagerLookup)factory.getProviderFactory(JtaTransactionManagerLookup.class);
+        Transaction suspended = null;
+        try {
+            if (lookup != null) {
+                if (lookup.getTransactionManager() != null) {
+                    try {
+                        suspended = lookup.getTransactionManager().suspend();
+                    } catch (SystemException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+            runnable.run();
+        } finally {
+            if (suspended != null) {
+                try {
+                    lookup.getTransactionManager().resume(suspended);
+                } catch (InvalidTransactionException e) {
+                    throw new RuntimeException(e);
+                } catch (SystemException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+        }
+
+    }
+
+    public static String getIdentityProviderDisplayName(KeycloakSession session, IdentityProviderModel provider) {
+        String displayName = provider.getDisplayName();
+        if (displayName != null && !displayName.isEmpty()) {
+            return displayName;
+        }
+
+        SocialIdentityProviderFactory providerFactory = (SocialIdentityProviderFactory) session.getKeycloakSessionFactory()
+                .getProviderFactory(SocialIdentityProvider.class, provider.getProviderId());
+        if (providerFactory != null) {
+            return providerFactory.getName();
+        } else {
+            return provider.getAlias();
+        }
+    }
+
+
 }

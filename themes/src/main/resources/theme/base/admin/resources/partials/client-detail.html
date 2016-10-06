@@ -110,7 +110,7 @@
                     <input ng-model="client.serviceAccountsEnabled" name="serviceAccountsEnabled" id="serviceAccountsEnabled" onoffswitch on-text="{{:: 'onText' | translate}}" off-text="{{:: 'offText' | translate}}"/>
                 </div>
             </div>
-            <div class="form-group" data-ng-show="protocol == 'openid-connect'">
+            <div class="form-group" data-ng-show="serverInfo.profileInfo.previewEnabled && protocol == 'openid-connect'">
                 <label class="col-md-2 control-label" for="authorizationServicesEnabled">{{:: 'authz-authorization-services-enabled' | translate}}</label>
                 <kc-tooltip>{{:: 'authz-authorization-services-enabled.tooltip' | translate}}</kc-tooltip>
                 <div class="col-md-6">
@@ -330,6 +330,36 @@
                     <input ng-model="client.attributes.saml_single_logout_service_url_redirect" class="form-control" type="text" name="logoutRedirectBinding" id="logoutRedirectBinding" />
                 </div>
                 <kc-tooltip>{{:: 'logout-service-redir-binding-url.tooltip' | translate}}</kc-tooltip>
+            </div>
+        </fieldset>
+
+        <fieldset data-ng-show="protocol == 'openid-connect'">
+            <legend collapsed><span class="text">{{:: 'fine-oidc-endpoint-conf' | translate}}</span>  <kc-tooltip>{{:: 'fine-oidc-endpoint-conf.tooltip' | translate}}</kc-tooltip></legend>
+            <div class="form-group clearfix block" data-ng-show="protocol == 'openid-connect'">
+                <label class="col-md-2 control-label" for="userInfoSignedResponseAlg">{{:: 'user-info-signed-response-alg' | translate}}</label>
+                <div class="col-sm-6">
+                    <div>
+                        <select class="form-control" id="userInfoSignedResponseAlg"
+                                ng-change="changeUserInfoSignedResponseAlg()"
+                                ng-model="userInfoSignedResponseAlg"
+                                ng-options="sig for sig in oidcSignatureAlgorithms">
+                        </select>
+                    </div>
+                </div>
+                <kc-tooltip>{{:: 'user-info-signed-response-alg.tooltip' | translate}}</kc-tooltip>
+            </div>
+            <div class="form-group clearfix block" data-ng-show="protocol == 'openid-connect'">
+                <label class="col-md-2 control-label" for="requestObjectSignatureAlg">{{:: 'request-object-signature-alg' | translate}}</label>
+                <div class="col-sm-6">
+                    <div>
+                        <select class="form-control" id="requestObjectSignatureAlg"
+                                ng-change="changeRequestObjectSignatureAlg()"
+                                ng-model="requestObjectSignatureAlg"
+                                ng-options="sig for sig in requestObjectSignatureAlgorithms">
+                        </select>
+                    </div>
+                </div>
+                <kc-tooltip>{{:: 'request-object-signature-alg.tooltip' | translate}}</kc-tooltip>
             </div>
         </fieldset>
 

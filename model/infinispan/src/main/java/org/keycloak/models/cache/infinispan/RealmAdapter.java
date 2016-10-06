@@ -19,9 +19,23 @@ package org.keycloak.models.cache.infinispan;
 
 import org.keycloak.Config;
 import org.keycloak.common.enums.SslRequired;
-import org.keycloak.common.util.StringPropertyReplacer;
 import org.keycloak.component.ComponentModel;
-import org.keycloak.models.*;
+import org.keycloak.models.AuthenticationExecutionModel;
+import org.keycloak.models.AuthenticationFlowModel;
+import org.keycloak.models.AuthenticatorConfigModel;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientTemplateModel;
+import org.keycloak.models.GroupModel;
+import org.keycloak.models.IdentityProviderMapperModel;
+import org.keycloak.models.IdentityProviderModel;
+import org.keycloak.models.OTPPolicy;
+import org.keycloak.models.PasswordPolicy;
+import org.keycloak.models.RealmModel;
+import org.keycloak.models.RequiredActionProviderModel;
+import org.keycloak.models.RequiredCredentialModel;
+import org.keycloak.models.RoleModel;
+import org.keycloak.models.UserFederationMapperModel;
+import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.cache.infinispan.entities.CachedRealm;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
@@ -29,7 +43,13 @@ import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -1465,4 +1485,64 @@ public class RealmAdapter implements RealmModel {
         if (isUpdated()) return updated.getComponent(id);
         return cached.getComponents().get(id);
     }
+
+    public void setAttribute(String name, String value) {
+        getDelegateForUpdate();
+        updated.setAttribute(name, value);
+    }
+
+    @Override
+    public void setAttribute(String name, Boolean value) {
+        getDelegateForUpdate();
+        updated.setAttribute(name, value);
+    }
+
+    @Override
+    public void setAttribute(String name, Integer value) {
+        getDelegateForUpdate();
+        updated.setAttribute(name, value);
+    }
+
+    @Override
+    public void setAttribute(String name, Long value) {
+        getDelegateForUpdate();
+        updated.setAttribute(name, value);
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        getDelegateForUpdate();
+        updated.removeAttribute(name);
+    }
+
+    @Override
+    public String getAttribute(String name) {
+        if (isUpdated()) return updated.getAttribute(name);
+        return cached.getAttribute(name);
+    }
+
+    @Override
+    public Integer getAttribute(String name, Integer defaultValue) {
+        if (isUpdated()) return updated.getAttribute(name, defaultValue);
+        return cached.getAttribute(name, defaultValue);
+    }
+
+    @Override
+    public Long getAttribute(String name, Long defaultValue) {
+        if (isUpdated()) return updated.getAttribute(name, defaultValue);
+        return cached.getAttribute(name, defaultValue);
+    }
+
+    @Override
+    public Boolean getAttribute(String name, Boolean defaultValue) {
+        if (isUpdated()) return updated.getAttribute(name, defaultValue);
+        return cached.getAttribute(name, defaultValue);
+    }
+
+    @Override
+    public Map<String, String> getAttributes() {
+        if (isUpdated()) return updated.getAttributes();
+        return cached.getAttributes();
+    }
+
 }

@@ -17,8 +17,8 @@
 
 package org.keycloak.authentication.authenticators.browser;
 
-import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.events.Errors;
 import org.keycloak.forms.login.LoginFormsProvider;
@@ -31,8 +31,6 @@ import org.keycloak.services.messages.Messages;
 
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import java.util.LinkedList;
-import java.util.List;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -58,15 +56,14 @@ public class OTPFormAuthenticator extends AbstractUsernameFormAuthenticator impl
             context.resetFlow();
             return;
         }
-        List<UserCredentialModel> credentials = new LinkedList<>();
         String password = inputData.getFirst(CredentialRepresentation.TOTP);
         if (password == null) {
             Response challengeResponse = challenge(context, null);
             context.challenge(challengeResponse);
             return;
         }
-        credentials.add(UserCredentialModel.otp(context.getRealm().getOTPPolicy().getType(), password));
-        boolean valid = context.getSession().users().validCredentials(context.getSession(), context.getRealm(), context.getUser(), credentials);
+        boolean valid = context.getSession().userCredentialManager().isValid(context.getRealm(), context.getUser(),
+                UserCredentialModel.otp(context.getRealm().getOTPPolicy().getType(), password));
         if (!valid) {
             context.getEvent().user(context.getUser())
                     .error(Errors.INVALID_USER_CREDENTIALS);
@@ -91,7 +88,7 @@ public class OTPFormAuthenticator extends AbstractUsernameFormAuthenticator impl
 
     @Override
     public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) {
-        return session.users().configuredForCredentialType(realm.getOTPPolicy().getType(), realm, user);
+        return session.userCredentialManager().isConfiguredFor(realm, user, realm.getOTPPolicy().getType());
     }
 
     @Override

@@ -29,6 +29,8 @@ import org.keycloak.models.utils.RepresentationToModel;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.services.ErrorResponseException;
 import org.keycloak.services.ForbiddenException;
+import org.keycloak.services.validation.ClientValidator;
+import org.keycloak.services.validation.ValidationMessages;
 
 import javax.ws.rs.core.Response;
 
@@ -45,10 +47,22 @@ public abstract class AbstractClientRegistrationProvider implements ClientRegist
         this.session = session;
     }
 
-    public ClientRepresentation create(ClientRepresentation client) {
+    public ClientRepresentation create(ClientRegistrationContext context) {
+        ClientRepresentation client = context.getClient();
+
         event.event(EventType.CLIENT_REGISTER);
 
         auth.requireCreate();
+
+        ValidationMessages validationMessages = new ValidationMessages();
+        if (!validateClient(context, validationMessages)) {
+            String errorCode = validationMessages.fieldHasError("redirectUris") ? ErrorCodes.INVALID_REDIRECT_URI : ErrorCodes.INVALID_CLIENT_METADATA;
+            throw new ErrorResponseException(
+                    errorCode,
+                    validationMessages.getStringMessages(),
+                    Response.Status.BAD_REQUEST
+            );
+        }
 
         try {
             ClientModel clientModel = RepresentationToModel.createClient(session, session.getContext().getRealm(), client, true);
@@ -94,7 +108,9 @@ public abstract class AbstractClientRegistrationProvider implements ClientRegist
         return rep;
     }
 
-    public ClientRepresentation update(String clientId, ClientRepresentation rep) {
+    public ClientRepresentation update(String clientId, ClientRegistrationContext context) {
+        ClientRepresentation rep = context.getClient();
+
         event.event(EventType.CLIENT_UPDATE).client(clientId);
 
         ClientModel client = session.getContext().getRealm().getClientByClientId(clientId);
@@ -102,6 +118,16 @@ public abstract class AbstractClientRegistrationProvider implements ClientRegist
 
         if (!client.getClientId().equals(rep.getClientId())) {
             throw new ErrorResponseException(ErrorCodes.INVALID_CLIENT_METADATA, "Client Identifier modified", Response.Status.BAD_REQUEST);
+        }
+
+        ValidationMessages validationMessages = new ValidationMessages();
+        if (!validateClient(context, validationMessages)) {
+            String errorCode = validationMessages.fieldHasError("redirectUris") ? ErrorCodes.INVALID_REDIRECT_URI : ErrorCodes.INVALID_CLIENT_METADATA;
+            throw new ErrorResponseException(
+                    errorCode,
+                    validationMessages.getStringMessages(),
+                    Response.Status.BAD_REQUEST
+            );
         }
 
         RepresentationToModel.updateClient(rep, client);
@@ -115,6 +141,7 @@ public abstract class AbstractClientRegistrationProvider implements ClientRegist
         event.client(client.getClientId()).success();
         return rep;
     }
+
 
     public void delete(String clientId) {
         event.event(EventType.CLIENT_DELETE).client(clientId);
@@ -141,6 +168,11 @@ public abstract class AbstractClientRegistrationProvider implements ClientRegist
 
     @Override
     public void close() {
+    }
+
+    protected boolean validateClient(ClientRegistrationContext context, ValidationMessages validationMessages) {
+        ClientRepresentation client = context.getClient();
+        return ClientValidator.validate(client, validationMessages);
     }
 
 }

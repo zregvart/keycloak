@@ -19,16 +19,15 @@ package org.keycloak.example.photoz.admin;
 
 import org.keycloak.example.photoz.entity.Album;
 
-import javax.ejb.Stateless;
+import javax.inject.Inject;
 import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
@@ -36,12 +35,11 @@ import java.util.List;
  * @author <a href="mailto:psilva@redhat.com">Pedro Igor</a>
  */
 @Path("/admin/album")
-@Stateless
 public class AdminAlbumService {
 
     public static final String SCOPE_ADMIN_ALBUM_MANAGE = "urn:photoz.com:scopes:album:admin:manage";
 
-    @PersistenceContext
+    @Inject
     private EntityManager entityManager;
 
     @Context
@@ -54,7 +52,12 @@ public class AdminAlbumService {
         List<Album> result = this.entityManager.createQuery("from Album").getResultList();
 
         for (Album album : result) {
-            albums.computeIfAbsent(album.getUserId(), key -> new ArrayList<>()).add(album);
+            //We need to compile this under JDK7 so we can't use lambdas
+            //albums.computeIfAbsent(album.getUserId(), key -> new ArrayList<>()).add(album);
+
+            if (!albums.containsKey(album.getUserId())) {
+                albums.put(album.getUserId(), Collections.singletonList(album));
+            }
         }
 
         return Response.ok(albums).build();

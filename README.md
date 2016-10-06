@@ -52,7 +52,7 @@ To stop the server press `Ctrl + C`.
 
 Help and Documentation
 ----------------------
-* [Documentation](http://keycloak.jboss.org/docs) - User Guide, Admin REST API and Javadocs
+* [Documentation](http://www.keycloak.org/documentation.html) - User Guide, Admin REST API and Javadocs
 * [User Mailing List](https://lists.jboss.org/mailman/listinfo/keycloak-user) - Mailing list to ask for help and general questions about Keycloak
 * [JIRA](https://issues.jboss.org/projects/KEYCLOAK) - Issue tracker for bugs and feature requests
 
@@ -65,6 +65,7 @@ Contributing
     * [Testsuite](misc/Testsuite.md) - Details about testsuite, but also how to quickly run Keycloak during development and a few test tools (OTP generation, LDAP server, Mail server)
     * [Database Testing](misc/DatabaseTesting.md) - How to do testing of Keycloak on different databases
     * [Updating Database](misc/UpdatingDatabaseSchema.md) - How to change the Keycloak database
+    * [Changing the Default keycloak-subsystem Configuration](misc/UpdatingServerConfig.md) - How to update the default keycloak-subsystem config
 * [Developer Mailing List](https://lists.jboss.org/mailman/listinfo/keycloak-dev) - Mailing list to discuss development of Keycloak
 
 

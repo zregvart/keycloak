@@ -16,20 +16,30 @@
  */
 package org.keycloak.migration.migrators;
 
-import java.util.List;
-
 import org.keycloak.Config;
 import org.keycloak.migration.MigrationProvider;
 import org.keycloak.migration.ModelVersion;
-import org.keycloak.models.*;
+import org.keycloak.models.AdminRoles;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.Constants;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
+
+import java.util.List;
 
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
-public class MigrateTo1_6_0 {
+public class MigrateTo1_6_0 implements Migration {
 
     public static final ModelVersion VERSION = new ModelVersion("1.6.0");
+
+    public ModelVersion getVersion() {
+        return VERSION;
+    }
 
     public void migrate(KeycloakSession session) {
         MigrationProvider provider = session.getProvider(MigrationProvider.class);

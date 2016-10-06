@@ -17,8 +17,6 @@
 
 package org.keycloak.migration.migrators;
 
-import java.util.List;
-import java.util.Map;
 import org.keycloak.migration.ModelVersion;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.LDAPConstants;
@@ -27,12 +25,19 @@ import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
-public class MigrateTo1_8_0 {
+public class MigrateTo1_8_0 implements Migration {
 
     public static final ModelVersion VERSION = new ModelVersion("1.8.0");
+
+    public ModelVersion getVersion() {
+        return VERSION;
+    }
 
     public void migrate(KeycloakSession session) {
         List<RealmModel> realms = session.realms().getRealms();

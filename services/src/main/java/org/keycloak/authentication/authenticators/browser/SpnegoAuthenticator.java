@@ -18,8 +18,8 @@
 package org.keycloak.authentication.authenticators.browser;
 
 import org.jboss.resteasy.spi.HttpRequest;
-import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.common.constants.KerberosConstants;
 import org.keycloak.events.Errors;
@@ -86,7 +86,7 @@ public class SpnegoAuthenticator extends AbstractUsernameFormAuthenticator imple
         String spnegoToken = tokens[1];
         UserCredentialModel spnegoCredential = UserCredentialModel.kerberos(spnegoToken);
 
-        CredentialValidationOutput output = context.getSession().users().validCredentials(context.getSession(), context.getRealm(), spnegoCredential);
+        CredentialValidationOutput output = context.getSession().userCredentialManager().authenticate(context.getSession(), context.getRealm(), spnegoCredential);
 
         if (output.getAuthStatus() == CredentialValidationOutput.Status.AUTHENTICATED) {
             context.setUser(output.getAuthenticatedUser());

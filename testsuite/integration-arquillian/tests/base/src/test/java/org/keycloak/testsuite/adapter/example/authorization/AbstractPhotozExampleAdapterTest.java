@@ -80,8 +80,15 @@ public abstract class AbstractPhotozExampleAdapterTest extends AbstractExampleAd
     }
 
     @Before
-    public void beforePhotozExampleAdapterTest() {
+    public void beforePhotozExampleAdapterTest() throws FileNotFoundException {
         deleteAllCookiesForClientPage();
+
+        for (PolicyRepresentation policy : getAuthorizationResource().policies().policies()) {
+            if ("Only Owner Policy".equals(policy.getName())) {
+                policy.getConfig().put("mavenArtifactVersion", System.getProperty("project.version"));
+                getAuthorizationResource().policies().policy(policy.getId()).update(policy);
+            }
+        }
     }
 
     @Override

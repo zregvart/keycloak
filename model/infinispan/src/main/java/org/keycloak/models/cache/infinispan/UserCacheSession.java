@@ -18,6 +18,7 @@
 package org.keycloak.models.cache.infinispan;
 
 import org.jboss.logging.Logger;
+import org.keycloak.cluster.ClusterProvider;
 import org.keycloak.common.constants.ServiceAccountConstants;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.ClientModel;
@@ -34,20 +35,28 @@ import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserProvider;
-import org.keycloak.models.cache.CacheUserProvider;
+import org.keycloak.models.cache.CachedUserModel;
+import org.keycloak.models.cache.OnUserCache;
+import org.keycloak.models.cache.UserCache;
 import org.keycloak.models.cache.infinispan.entities.CachedFederatedIdentityLinks;
 import org.keycloak.models.cache.infinispan.entities.CachedUser;
 import org.keycloak.models.cache.infinispan.entities.CachedUserConsent;
 import org.keycloak.models.cache.infinispan.entities.CachedUserConsents;
 import org.keycloak.models.cache.infinispan.entities.UserListQuery;
+import org.keycloak.storage.UserStorageProvider;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
  */
-public class UserCacheSession implements CacheUserProvider {
+public class UserCacheSession implements UserCache {
     protected static final Logger logger = Logger.getLogger(UserCacheSession.class);
     protected UserCacheManager cache;
     protected KeycloakSession session;
@@ -71,9 +80,10 @@ public class UserCacheSession implements CacheUserProvider {
     @Override
     public void clear() {
         cache.clear();
+        ClusterProvider cluster = session.getProvider(ClusterProvider.class);
+        cluster.notify(InfinispanUserCacheProviderFactory.USER_CLEAR_CACHE_EVENTS, new ClearCacheEvent());
     }
 
-    @Override
     public UserProvider getDelegate() {
         if (!transactionActive) throw new IllegalStateException("Cannot access delegate without a transaction");
         if (delegate != null) return delegate;
@@ -88,6 +98,20 @@ public class UserCacheSession implements CacheUserProvider {
         invalidations.add(getUserByUsernameCacheKey(realm.getId(), user.getUsername()));
         if (realm.isIdentityFederationEnabled()) invalidations.add(getFederatedIdentityLinksCacheKey(user.getId()));
     }
+
+    @Override
+    public void evict(RealmModel realm, UserModel user) {
+        if (user instanceof CachedUserModel) {
+            ((CachedUserModel)user).invalidate();
+        } else {
+            invalidations.add(user.getId());
+            if (user.getEmail() != null) invalidations.add(getUserByEmailCacheKey(realm.getId(), user.getEmail()));
+            invalidations.add(getUserByUsernameCacheKey(realm.getId(), user.getUsername()));
+            if (realm.isIdentityFederationEnabled()) invalidations.add(getFederatedIdentityLinksCacheKey(user.getId()));
+        }
+    }
+
+
 
     protected void runInvalidations() {
         for (String realmId : realmInvalidations) {
@@ -147,29 +171,28 @@ public class UserCacheSession implements CacheUserProvider {
             logger.trace("registered for invalidation return delegate");
             return getDelegate().getUserById(id, realm);
         }
-
-        CachedUser cached = cache.get(id, CachedUser.class);
-        if (cached == null) {
-            logger.trace("not cached");
-            Long loaded = cache.getCurrentRevision(id);
-            UserModel model = getDelegate().getUserById(id, realm);
-            if (model == null) {
-                logger.trace("delegate returning null");
-                return null;
-            }
-            if (managedUsers.containsKey(id)) {
-                logger.trace("return managedusers");
-                return managedUsers.get(id);
-            }
-            if (invalidations.contains(id)) return model;
-            cached = new CachedUser(loaded, realm, model);
-            cache.addRevisioned(cached, startupRevision);
-        } else if (managedUsers.containsKey(id)) {
+        if (managedUsers.containsKey(id)) {
             logger.trace("return managedusers");
             return managedUsers.get(id);
         }
+
+        CachedUser cached = cache.get(id, CachedUser.class);
+        UserModel delegate = null;
+        boolean wasCached = cached != null;
+        if (cached == null) {
+            logger.trace("not cached");
+            Long loaded = cache.getCurrentRevision(id);
+            delegate = getDelegate().getUserById(id, realm);
+            if (delegate == null) {
+                logger.trace("delegate returning null");
+                return null;
+            }
+            cached = new CachedUser(loaded, realm, delegate);
+            cache.addRevisioned(cached, startupRevision);
+        }
         logger.trace("returning new cache adapter");
         UserAdapter adapter = new UserAdapter(cached, this, session, realm);
+        if (!wasCached) onCache(realm, adapter, delegate);
         managedUsers.put(id, adapter);
         return adapter;
     }
@@ -223,13 +246,7 @@ public class UserCacheSession implements CacheUserProvider {
                 return managedUsers.get(userId);
             }
 
-            CachedUser cached = cache.get(userId, CachedUser.class);
-            if (cached == null) {
-                cached = new CachedUser(loaded, realm, model);
-                cache.addRevisioned(cached, startupRevision);
-            }
-            logger.trace("return new cache adapter");
-            UserAdapter adapter = new UserAdapter(cached, this, session, realm);
+            UserAdapter adapter = getUserAdapter(realm, userId, loaded, model);
             managedUsers.put(userId, adapter);
             return adapter;
         } else {
@@ -242,6 +259,26 @@ public class UserCacheSession implements CacheUserProvider {
             logger.trace("return getUserById");
             return getUserById(userId, realm);
         }
+    }
+
+    protected UserAdapter getUserAdapter(RealmModel realm, String userId, Long loaded, UserModel delegate) {
+        CachedUser cached = cache.get(userId, CachedUser.class);
+        boolean wasCached = cached != null;
+        if (cached == null) {
+            cached = new CachedUser(loaded, realm, delegate);
+            cache.addRevisioned(cached, startupRevision);
+        }
+        UserAdapter adapter = new UserAdapter(cached, this, session, realm);
+        if (!wasCached) {
+            onCache(realm, adapter, delegate);
+        }
+        return adapter;
+
+    }
+
+    private void onCache(RealmModel realm, UserAdapter adapter, UserModel delegate) {
+        ((OnUserCache)getDelegate()).onCache(realm, adapter, delegate);
+        ((OnUserCache)session.userCredentialManager()).onCache(realm, adapter, delegate);
     }
 
     @Override
@@ -268,12 +305,7 @@ public class UserCacheSession implements CacheUserProvider {
             if (invalidations.contains(userId)) return model;
             if (managedUsers.containsKey(userId)) return managedUsers.get(userId);
 
-            CachedUser cached = cache.get(userId, CachedUser.class);
-            if (cached == null) {
-                cached = new CachedUser(loaded, realm, model);
-                cache.addRevisioned(cached, startupRevision);
-            }
-            UserAdapter adapter = new UserAdapter(cached, this, session, realm);
+            UserAdapter adapter = getUserAdapter(realm, userId, loaded, model);
             managedUsers.put(userId, adapter);
             return adapter;
         } else {
@@ -316,12 +348,7 @@ public class UserCacheSession implements CacheUserProvider {
             if (invalidations.contains(userId)) return model;
             if (managedUsers.containsKey(userId)) return managedUsers.get(userId);
 
-            CachedUser cached = cache.get(userId, CachedUser.class);
-            if (cached == null) {
-                cached = new CachedUser(loaded, realm, model);
-                cache.addRevisioned(cached, startupRevision);
-            }
-            UserAdapter adapter = new UserAdapter(cached, this, session, realm);
+            UserAdapter adapter = getUserAdapter(realm, userId, loaded, model);
             managedUsers.put(userId, adapter);
             return adapter;
         } else {
@@ -611,21 +638,6 @@ public class UserCacheSession implements CacheUserProvider {
     }
 
     @Override
-    public boolean validCredentials(KeycloakSession session, RealmModel realm, UserModel user, List<UserCredentialModel> input) {
-        return getDelegate().validCredentials(session, realm, user, input);
-    }
-
-    @Override
-    public boolean validCredentials(KeycloakSession session, RealmModel realm, UserModel user, UserCredentialModel... input) {
-        return getDelegate().validCredentials(session, realm, user, input);
-    }
-
-    @Override
-    public CredentialValidationOutput validCredentials(KeycloakSession session, RealmModel realm, UserCredentialModel... input) {
-        return getDelegate().validCredentials(session, realm, input);
-    }
-
-    @Override
     public void grantToAllUsers(RealmModel realm, RoleModel role) {
         realmInvalidations.add(realm.getId()); // easier to just invalidate whole realm
         getDelegate().grantToAllUsers(realm, role);
@@ -639,10 +651,12 @@ public class UserCacheSession implements CacheUserProvider {
 
     @Override
     public void preRemove(RealmModel realm, RoleModel role) {
+        realmInvalidations.add(realm.getId()); // easier to just invalidate whole realm
         getDelegate().preRemove(realm, role);
     }
     @Override
     public void preRemove(RealmModel realm, GroupModel group) {
+        realmInvalidations.add(realm.getId()); // easier to just invalidate whole realm
         getDelegate().preRemove(realm, group);
     }
 
@@ -666,7 +680,10 @@ public class UserCacheSession implements CacheUserProvider {
 
     @Override
     public void preRemove(RealmModel realm, ComponentModel component) {
+        if (!component.getProviderType().equals(UserStorageProvider.class.getName())) return;
+        realmInvalidations.add(realm.getId()); // easier to just invalidate whole realm
         getDelegate().preRemove(realm, component);
 
     }
+
 }

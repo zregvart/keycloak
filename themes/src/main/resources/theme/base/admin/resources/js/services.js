@@ -274,7 +274,7 @@ module.service('ServerInfo', function($resource, $q, $http) {
     var delay = $q.defer();
 
     $http.get(authUrl + '/admin/serverinfo').success(function(data) {
-        info = data;
+        angular.copy(data, info);
         delay.resolve(info);
     });
 
@@ -344,6 +344,14 @@ module.factory('User', function($resource) {
             method : 'PUT'
         }
     });
+});
+
+module.service('UserSearchState', function() {
+    this.isFirstSearch = true;
+    this.query = {
+        max : 20,
+        first : 0
+    };
 });
 
 module.factory('UserFederationInstances', function($resource) {

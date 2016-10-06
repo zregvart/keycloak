@@ -18,10 +18,9 @@
 package org.keycloak.models.jpa;
 
 import org.jboss.logging.Logger;
-import org.keycloak.common.util.MultivaluedHashMap;
-import org.keycloak.common.util.StringPropertyReplacer;
-import org.keycloak.component.ComponentModel;
 import org.keycloak.common.enums.SslRequired;
+import org.keycloak.common.util.MultivaluedHashMap;
+import org.keycloak.component.ComponentModel;
 import org.keycloak.jose.jwk.JWKBuilder;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
@@ -43,12 +42,28 @@ import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderCreationEventImpl;
 import org.keycloak.models.UserFederationProviderModel;
-import org.keycloak.models.jpa.entities.*;
+import org.keycloak.models.jpa.entities.AuthenticationExecutionEntity;
+import org.keycloak.models.jpa.entities.AuthenticationFlowEntity;
+import org.keycloak.models.jpa.entities.AuthenticatorConfigEntity;
+import org.keycloak.models.jpa.entities.ClientEntity;
+import org.keycloak.models.jpa.entities.ClientTemplateEntity;
+import org.keycloak.models.jpa.entities.ComponentConfigEntity;
+import org.keycloak.models.jpa.entities.ComponentEntity;
+import org.keycloak.models.jpa.entities.GroupEntity;
+import org.keycloak.models.jpa.entities.IdentityProviderEntity;
+import org.keycloak.models.jpa.entities.IdentityProviderMapperEntity;
+import org.keycloak.models.jpa.entities.RealmAttributeEntity;
+import org.keycloak.models.jpa.entities.RealmAttributes;
+import org.keycloak.models.jpa.entities.RealmEntity;
+import org.keycloak.models.jpa.entities.RequiredActionProviderEntity;
+import org.keycloak.models.jpa.entities.RequiredCredentialEntity;
+import org.keycloak.models.jpa.entities.RoleEntity;
+import org.keycloak.models.jpa.entities.UserFederationMapperEntity;
+import org.keycloak.models.jpa.entities.UserFederationProviderEntity;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
-
 import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -182,6 +197,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         em.flush();
     }
 
+    @Override
     public void setAttribute(String name, String value) {
         for (RealmAttributeEntity attr : realm.getAttributes()) {
             if (attr.getName().equals(name)) {
@@ -197,18 +213,22 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         realm.getAttributes().add(attr);
     }
 
+    @Override
     public void setAttribute(String name, Boolean value) {
         setAttribute(name, value.toString());
     }
 
+    @Override
     public void setAttribute(String name, Integer value) {
         setAttribute(name, value.toString());
     }
 
+    @Override
     public void setAttribute(String name, Long value) {
         setAttribute(name, value.toString());
     }
 
+    @Override
     public void removeAttribute(String name) {
         Iterator<RealmAttributeEntity> it = realm.getAttributes().iterator();
         while (it.hasNext()) {
@@ -220,6 +240,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         }
     }
 
+    @Override
     public String getAttribute(String name) {
         for (RealmAttributeEntity attr : realm.getAttributes()) {
             if (attr.getName().equals(name)) {
@@ -229,24 +250,28 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         return null;
     }
 
+    @Override
     public Integer getAttribute(String name, Integer defaultValue) {
         String v = getAttribute(name);
         return v != null ? Integer.parseInt(v) : defaultValue;
 
     }
 
+    @Override
     public Long getAttribute(String name, Long defaultValue) {
         String v = getAttribute(name);
         return v != null ? Long.parseLong(v) : defaultValue;
 
     }
 
+    @Override
     public Boolean getAttribute(String name, Boolean defaultValue) {
         String v = getAttribute(name);
         return v != null ? Boolean.parseBoolean(v) : defaultValue;
 
     }
 
+    @Override
     public Map<String, String> getAttributes() {
         // should always return a copy
         Map<String, String> result = new HashMap<String, String>();
@@ -255,6 +280,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         }
         return result;
     }
+
     @Override
     public boolean isBruteForceProtected() {
         return getAttribute("bruteForceProtected", false);
@@ -1244,9 +1270,10 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
 
         for (IdentityProviderEntity entity: entities) {
             IdentityProviderModel identityProviderModel = new IdentityProviderModel();
-
             identityProviderModel.setProviderId(entity.getProviderId());
             identityProviderModel.setAlias(entity.getAlias());
+            identityProviderModel.setDisplayName(entity.getDisplayName());
+
             identityProviderModel.setInternalId(entity.getInternalId());
             Map<String, String> config = entity.getConfig();
             Map<String, String> copy = new HashMap<>();
@@ -1283,6 +1310,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
 
         entity.setInternalId(KeycloakModelUtils.generateId());
         entity.setAlias(identityProvider.getAlias());
+        entity.setDisplayName(identityProvider.getDisplayName());
         entity.setProviderId(identityProvider.getProviderId());
         entity.setEnabled(identityProvider.isEnabled());
         entity.setStoreToken(identityProvider.isStoreToken());
@@ -1316,6 +1344,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         for (IdentityProviderEntity entity : this.realm.getIdentityProviders()) {
             if (entity.getInternalId().equals(identityProvider.getInternalId())) {
                 entity.setAlias(identityProvider.getAlias());
+                entity.setDisplayName(identityProvider.getDisplayName());
                 entity.setEnabled(identityProvider.isEnabled());
                 entity.setTrustEmail(identityProvider.isTrustEmail());
                 entity.setAuthenticateByDefault(identityProvider.isAuthenticateByDefault());

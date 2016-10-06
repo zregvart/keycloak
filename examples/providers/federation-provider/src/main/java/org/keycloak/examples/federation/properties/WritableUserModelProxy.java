@@ -17,8 +17,6 @@
 
 package org.keycloak.examples.federation.properties;
 
-import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.UserModelDelegate;
 
@@ -64,26 +62,4 @@ public class WritableUserModelProxy extends UserModelDelegate {
 
     }
 
-    @Override
-    public void updateCredentialDirectly(UserCredentialValueModel cred) {
-        if (cred.getType().equals(UserCredentialModel.PASSWORD)) {
-            throw new IllegalStateException("Shouldn't be using this method");
-        }
-        super.updateCredentialDirectly(cred);
-    }
-
-    @Override
-    public void updateCredential(UserCredentialModel cred) {
-        if (cred.getType().equals(UserCredentialModel.PASSWORD)) {
-            synchronized (provider.getProperties()) {
-                if (!provider.getProperties().containsKey(delegate.getUsername())) {
-                    throw new IllegalStateException("no user of that in properties file");
-                }
-                provider.getProperties().setProperty(delegate.getUsername(), cred.getValue());
-                provider.save();
-            }
-        } else {
-            super.updateCredential(cred);
-        }
-    }
 }

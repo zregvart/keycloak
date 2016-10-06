@@ -36,11 +36,11 @@ import org.keycloak.admin.client.Keycloak;
 import org.keycloak.common.VerificationException;
 import org.keycloak.common.util.PemUtils;
 import org.keycloak.constants.AdapterConstants;
+import org.keycloak.jose.jwk.JSONWebKeySet;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.jose.jws.crypto.RSAProvider;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.OIDCLoginProtocolService;
-import org.keycloak.jose.jwk.JSONWebKeySet;
 import org.keycloak.protocol.oidc.utils.OIDCResponseType;
 import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.IDToken;
@@ -48,7 +48,6 @@ import org.keycloak.representations.RefreshToken;
 import org.keycloak.testsuite.arquillian.AuthServerTestEnricher;
 import org.keycloak.util.BasicAuthHelper;
 import org.keycloak.util.JsonSerialization;
-
 import org.keycloak.util.TokenUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -105,6 +104,10 @@ public class OAuthClient {
 
     private String nonce;
 
+    private String request;
+
+    private String requestUri;
+
     private Map<String, PublicKey> publicKeys = new HashMap<>();
 
     public void init(Keycloak adminClient, WebDriver driver) {
@@ -121,6 +124,9 @@ public class OAuthClient {
         clientSessionState = null;
         clientSessionHost = null;
         maxAge = null;
+        nonce = null;
+        request = null;
+        requestUri = null;
     }
 
     public AuthorizationEndpointResponse doLogin(String username, String password) {
@@ -536,6 +542,12 @@ public class OAuthClient {
         if (maxAge != null) {
             b.queryParam(OIDCLoginProtocol.MAX_AGE_PARAM, maxAge);
         }
+        if (request != null) {
+            b.queryParam(OIDCLoginProtocol.REQUEST_PARAM, request);
+        }
+        if (requestUri != null) {
+            b.queryParam(OIDCLoginProtocol.REQUEST_URI_PARAM, requestUri);
+        }
         return b.build(realm).toString();
     }
 
@@ -641,6 +653,16 @@ public class OAuthClient {
 
     public OAuthClient nonce(String nonce) {
         this.nonce = nonce;
+        return this;
+    }
+
+    public OAuthClient request(String request) {
+        this.request = request;
+        return this;
+    }
+
+    public OAuthClient requestUri(String requestUri) {
+        this.requestUri = requestUri;
         return this;
     }
 

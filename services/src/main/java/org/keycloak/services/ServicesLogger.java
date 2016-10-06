@@ -17,26 +17,26 @@
 
 package org.keycloak.services;
 
-import java.io.IOException;
-import java.net.URI;
-import javax.naming.NamingException;
 import org.jboss.logging.BasicLogger;
 import org.jboss.logging.Logger;
 import org.jboss.logging.annotations.Cause;
 import org.jboss.logging.annotations.LogMessage;
 import org.jboss.logging.annotations.Message;
 import org.jboss.logging.annotations.MessageLogger;
+import org.jboss.logging.annotations.Once;
+import org.keycloak.email.EmailException;
+import org.keycloak.events.EventListenerProvider;
+import org.keycloak.models.ModelDuplicateException;
+
+import javax.naming.NamingException;
+import java.io.IOException;
+import java.net.URI;
 
 import static org.jboss.logging.Logger.Level.DEBUG;
 import static org.jboss.logging.Logger.Level.ERROR;
 import static org.jboss.logging.Logger.Level.FATAL;
 import static org.jboss.logging.Logger.Level.INFO;
 import static org.jboss.logging.Logger.Level.WARN;
-
-import org.jboss.logging.annotations.Once;
-import org.keycloak.email.EmailException;
-import org.keycloak.events.EventListenerProvider;
-import org.keycloak.models.ModelDuplicateException;
 
 
 /**
@@ -97,7 +97,7 @@ public interface ServicesLogger extends BasicLogger {
     @Message(id=12, value="Failed to delete '%s'")
     void failedToDeleteFile(String fileName);
 
-    @LogMessage(level = DEBUG)
+    @LogMessage(level = WARN)
     @Message(id=13, value="Failed authentication")
     void failedAuthentication(@Cause Throwable t);
 
@@ -429,5 +429,13 @@ public interface ServicesLogger extends BasicLogger {
     @LogMessage(level = WARN)
     @Message(id=96, value="Not found JWK of supported keyType under jwks_uri for usage: %s")
     void supportedJwkNotFound(String usage);
+
+    @LogMessage(level = WARN)
+    @Message(id=97, value="Invalid request")
+    void invalidRequest(@Cause Throwable t);
+
+    @LogMessage(level = ERROR)
+    @Message(id=98, value="Failed to get redirect uris from sector identifier URI: %s")
+    void failedToGetRedirectUrisFromSectorIdentifierUri(@Cause Throwable t, String sectorIdentifierUri);
 
 }

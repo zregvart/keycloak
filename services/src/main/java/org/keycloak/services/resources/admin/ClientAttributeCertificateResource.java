@@ -22,21 +22,23 @@ import org.jboss.resteasy.plugins.providers.multipart.InputPart;
 import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
 import org.jboss.resteasy.spi.NotAcceptableException;
 import org.jboss.resteasy.spi.NotFoundException;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.common.util.StreamUtil;
 import org.keycloak.events.admin.OperationType;
 import org.keycloak.events.admin.ResourceType;
 import org.keycloak.jose.jwk.JSONWebKeySet;
 import org.keycloak.jose.jwk.JWK;
+import org.keycloak.jose.jwk.JWKParser;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
-import org.keycloak.protocol.oidc.utils.JWKSUtils;
+import org.keycloak.protocol.oidc.utils.JWKSHttpUtils;
 import org.keycloak.representations.KeyStoreConfig;
 import org.keycloak.representations.idm.CertificateRepresentation;
 import org.keycloak.services.ErrorResponseException;
-import org.keycloak.common.util.PemUtils;
 import org.keycloak.services.util.CertificateInfoHelper;
+import org.keycloak.util.JWKSUtils;
 import org.keycloak.util.JsonSerialization;
 
 import javax.ws.rs.Consumes;
@@ -48,7 +50,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,6 +66,10 @@ import java.util.Map;
  * @version $Revision: 1 $
  */
 public class ClientAttributeCertificateResource {
+
+    public static final String CERTIFICATE_PEM = "Certificate PEM";
+    public static final String PUBLIC_KEY_PEM = "Public Key PEM";
+    public static final String JSON_WEB_KEY_SET = "JSON Web Key Set";
 
     protected RealmModel realm;
     private RealmAuth auth;
@@ -145,16 +150,15 @@ public class ClientAttributeCertificateResource {
             throw new NotFoundException("Could not find client");
         }
 
-        CertificateRepresentation info = getCertFromRequest(uriInfo, input);
-
         try {
+            CertificateRepresentation info = getCertFromRequest(input);
             CertificateInfoHelper.updateClientModelCertificateInfo(client, info, attributePrefix);
+
+            adminEvent.operation(OperationType.ACTION).resourcePath(session.getContext().getUri()).representation(info).success();
+            return info;
         } catch (IllegalStateException ise) {
             throw new ErrorResponseException("certificate-not-found", "Certificate or key with given alias not found in the keystore", Response.Status.BAD_REQUEST);
         }
-
-        adminEvent.operation(OperationType.ACTION).resourcePath(session.getContext().getUri()).representation(info).success();
-        return info;
     }
 
     /**
@@ -176,37 +180,53 @@ public class ClientAttributeCertificateResource {
             throw new NotFoundException("Could not find client");
         }
 
-        CertificateRepresentation info = getCertFromRequest(uriInfo, input);
-        info.setPrivateKey(null);
-
         try {
+            CertificateRepresentation info = getCertFromRequest(input);
+            info.setPrivateKey(null);
             CertificateInfoHelper.updateClientModelCertificateInfo(client, info, attributePrefix);
+
+            adminEvent.operation(OperationType.ACTION).resourcePath(session.getContext().getUri()).representation(info).success();
+            return info;
         } catch (IllegalStateException ise) {
             throw new ErrorResponseException("certificate-not-found", "Certificate or key with given alias not found in the keystore", Response.Status.BAD_REQUEST);
         }
-
-        adminEvent.operation(OperationType.ACTION).resourcePath(session.getContext().getUri()).representation(info).success();
-        return info;
     }
 
-    private CertificateRepresentation getCertFromRequest(UriInfo uriInfo, MultipartFormDataInput input) throws IOException {
+    private CertificateRepresentation getCertFromRequest(MultipartFormDataInput input) throws IOException {
         auth.requireManage();
         CertificateRepresentation info = new CertificateRepresentation();
         Map<String, List<InputPart>> uploadForm = input.getFormDataMap();
         String keystoreFormat = uploadForm.get("keystoreFormat").get(0).getBodyAsString();
         List<InputPart> inputParts = uploadForm.get("file");
-        if (keystoreFormat.equals("Certificate PEM")) {
+        if (keystoreFormat.equals(CERTIFICATE_PEM)) {
             String pem = StreamUtil.readString(inputParts.get(0).getBody(InputStream.class, null));
+
+            // Validate format
+            KeycloakModelUtils.getCertificate(pem);
+
             info.setCertificate(pem);
             return info;
+        } else if (keystoreFormat.equals(PUBLIC_KEY_PEM)) {
+            String pem = StreamUtil.readString(inputParts.get(0).getBody(InputStream.class, null));
 
-        } else if (keystoreFormat.equals("JSON Web Key Set (JWK)")) {
+            // Validate format
+            KeycloakModelUtils.getPublicKey(pem);
+
+            info.setPublicKey(pem);
+            return info;
+        } else if (keystoreFormat.equals(JSON_WEB_KEY_SET)) {
             InputStream stream = inputParts.get(0).getBody(InputStream.class, null);
             JSONWebKeySet keySet = JsonSerialization.readValue(stream, JSONWebKeySet.class);
-            PublicKey publicKey = JWKSUtils.getKeyForUse(keySet, JWK.Use.SIG);
-            String publicKeyPem = KeycloakModelUtils.getPemFromKey(publicKey);
-            info.setPublicKey(publicKeyPem);
-            return info;
+            JWK publicKeyJwk = JWKSUtils.getKeyForUse(keySet, JWK.Use.SIG);
+            if (publicKeyJwk == null) {
+                throw new IllegalStateException("Certificate not found for use sig");
+            } else {
+                PublicKey publicKey = JWKParser.create(publicKeyJwk).toPublicKey();
+                String publicKeyPem = KeycloakModelUtils.getPemFromKey(publicKey);
+                info.setPublicKey(publicKeyPem);
+                info.setKid(publicKeyJwk.getKeyId());
+                return info;
+            }
         }
 
 

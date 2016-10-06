@@ -17,6 +17,7 @@
 
 package org.keycloak.testsuite.model;
 
+import com.google.common.collect.ImmutableMap;
 import org.junit.Assert;
 import org.junit.Test;
 import org.keycloak.models.ClientModel;
@@ -27,13 +28,13 @@ import org.keycloak.models.UserModel;
 import org.keycloak.models.UserModel.RequiredAction;
 import org.keycloak.services.managers.ClientManager;
 
-import static org.junit.Assert.assertNotNull;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.junit.Assert.assertNotNull;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -209,6 +210,55 @@ public class UserModelTest extends AbstractModelTest {
         attrVals = user.getAttribute("key2");
         Assert.assertEquals(1, attrVals.size());
         Assert.assertEquals("val23", attrVals.get(0));
+    }
+
+    // KEYCLOAK-3494
+    @Test
+    public void testUpdateUserAttribute() throws Exception {
+        RealmModel realm = realmManager.createRealm("original");
+        UserModel user = session.users().addUser(realm, "user");
+        
+        user.setSingleAttribute("key1", "value1");        
+
+        commit();
+
+        realm = realmManager.getRealmByName("original");
+        user = session.users().getUserByUsername("user", realm);
+
+        // Update attribute
+        List<String> attrVals = new ArrayList<>(Arrays.asList( "val2" ));
+        user.setAttribute("key1", attrVals);
+        Map<String, List<String>> allAttrVals = user.getAttributes();
+
+        // Ensure same transaction is able to see updated value
+        Assert.assertEquals(1, allAttrVals.size());
+        Assert.assertEquals(allAttrVals.get("key1"), Arrays.asList("val2"));
+
+        commit();
+    }
+    
+    // KEYCLOAK-3608
+    @Test
+    public void testUpdateUserSingleAttribute() {
+        Map<String, List<String>> expected = ImmutableMap.of(
+                "key1", Arrays.asList("value3"), 
+                "key2", Arrays.asList("value2"));
+        
+        RealmModel realm = realmManager.createRealm("original");
+        UserModel user = session.users().addUser(realm, "user");
+        
+        user.setSingleAttribute("key1", "value1");
+        user.setSingleAttribute("key2", "value2");
+        
+        // Overwrite the first attribute
+        user.setSingleAttribute("key1", "value3");
+        
+        Assert.assertEquals(expected, user.getAttributes());
+        
+        commit();
+        
+        realm = session.realms().getRealmByName("original");        
+        Assert.assertEquals(expected, session.users().getUserByUsername("user", realm).getAttributes());        
     }
 
     @Test

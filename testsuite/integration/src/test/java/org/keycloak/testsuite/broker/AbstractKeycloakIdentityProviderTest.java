@@ -17,21 +17,6 @@
 
 package org.keycloak.testsuite.broker;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.HashMap;
-import java.util.Set;
-
-import javax.mail.MessagingException;
-import javax.mail.internet.MimeMessage;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.ClientRequestContext;
-import javax.ws.rs.client.ClientRequestFilter;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.keycloak.models.ClientModel;
@@ -45,10 +30,24 @@ import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.keycloak.services.Urls;
-import org.keycloak.testsuite.DummyUserFederationProviderFactory;
 import org.keycloak.testsuite.broker.util.UserSessionStatusServlet;
+import org.keycloak.testsuite.federation.DummyUserFederationProviderFactory;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
+
+import javax.mail.MessagingException;
+import javax.mail.internet.MimeMessage;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.ClientRequestContext;
+import javax.ws.rs.client.ClientRequestFilter;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -314,6 +313,19 @@ public abstract class AbstractKeycloakIdentityProviderTest extends AbstractIdent
             identityProviderModel.setTrustEmail(false);
             getRealm().setVerifyEmail(false);
         }
+    }
+
+    /**
+     * Test for KEYCLOAK-3505 - Verify the claims from the claim set returned by the OIDC UserInfo are correctly mapped
+     *  by the user attribute mapper
+     *
+     */
+    protected void verifyAttributeMapperHandlesUserInfoClaims() {
+        IdentityProviderModel identityProviderModel = getIdentityProviderModel();
+        setUpdateProfileFirstLogin(IdentityProviderRepresentation.UPFLM_ON);
+
+        UserModel user = assertSuccessfulAuthentication(identityProviderModel, "test-user", "new@email.com", true);
+        Assert.assertEquals("A00", user.getFirstAttribute("tenantid"));
     }
 
     @Test

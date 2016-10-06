@@ -27,6 +27,8 @@ import org.keycloak.models.UserFederationProviderModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.provider.Provider;
 
+import java.util.List;
+
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
@@ -35,10 +37,11 @@ public interface UserFederatedStorageProvider extends Provider,
         UserAttributeFederatedStorage,
         UserBrokerLinkFederatedStorage,
         UserConsentFederatedStorage,
-        UserCredentialsFederatedStorage,
         UserGroupMembershipFederatedStorage,
         UserRequiredActionsFederatedStorage,
         UserRoleMappingsFederatedStorage {
+
+    List<String> getStoredUsers(RealmModel realm, int first, int max);
 
     void preRemove(RealmModel realm);
 

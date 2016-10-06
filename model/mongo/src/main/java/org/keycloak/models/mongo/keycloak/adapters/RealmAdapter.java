@@ -19,12 +19,10 @@ package org.keycloak.models.mongo.keycloak.adapters;
 
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
-
+import org.keycloak.common.enums.SslRequired;
 import org.keycloak.common.util.MultivaluedHashMap;
-import org.keycloak.common.util.StringPropertyReplacer;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.connections.mongo.api.context.MongoStoreInvocationContext;
-import org.keycloak.common.enums.SslRequired;
 import org.keycloak.jose.jwk.JWKBuilder;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
@@ -47,20 +45,20 @@ import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProviderCreationEventImpl;
 import org.keycloak.models.UserFederationProviderModel;
-import org.keycloak.models.entities.AuthenticationExecutionEntity;
-import org.keycloak.models.entities.AuthenticationFlowEntity;
-import org.keycloak.models.entities.AuthenticatorConfigEntity;
-import org.keycloak.models.entities.ComponentEntity;
-import org.keycloak.models.entities.IdentityProviderEntity;
-import org.keycloak.models.entities.IdentityProviderMapperEntity;
-import org.keycloak.models.entities.RequiredActionProviderEntity;
-import org.keycloak.models.entities.RequiredCredentialEntity;
-import org.keycloak.models.entities.UserFederationMapperEntity;
-import org.keycloak.models.entities.UserFederationProviderEntity;
+import org.keycloak.models.mongo.keycloak.entities.AuthenticationExecutionEntity;
+import org.keycloak.models.mongo.keycloak.entities.AuthenticationFlowEntity;
+import org.keycloak.models.mongo.keycloak.entities.AuthenticatorConfigEntity;
+import org.keycloak.models.mongo.keycloak.entities.ComponentEntity;
+import org.keycloak.models.mongo.keycloak.entities.IdentityProviderEntity;
+import org.keycloak.models.mongo.keycloak.entities.IdentityProviderMapperEntity;
 import org.keycloak.models.mongo.keycloak.entities.MongoClientEntity;
 import org.keycloak.models.mongo.keycloak.entities.MongoClientTemplateEntity;
 import org.keycloak.models.mongo.keycloak.entities.MongoRealmEntity;
 import org.keycloak.models.mongo.keycloak.entities.MongoRoleEntity;
+import org.keycloak.models.mongo.keycloak.entities.RequiredActionProviderEntity;
+import org.keycloak.models.mongo.keycloak.entities.RequiredCredentialEntity;
+import org.keycloak.models.mongo.keycloak.entities.UserFederationMapperEntity;
+import org.keycloak.models.mongo.keycloak.entities.UserFederationProviderEntity;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
 import java.security.Key;
@@ -914,6 +912,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
 
             identityProviderModel.setProviderId(entity.getProviderId());
             identityProviderModel.setAlias(entity.getAlias());
+            identityProviderModel.setDisplayName(entity.getDisplayName());
             identityProviderModel.setInternalId(entity.getInternalId());
             Map<String, String> config = entity.getConfig();
             Map<String, String> copy = new HashMap<>();
@@ -950,6 +949,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
 
         entity.setInternalId(KeycloakModelUtils.generateId());
         entity.setAlias(identityProvider.getAlias());
+        entity.setDisplayName(identityProvider.getDisplayName());
         entity.setProviderId(identityProvider.getProviderId());
         entity.setEnabled(identityProvider.isEnabled());
         entity.setTrustEmail(identityProvider.isTrustEmail());
@@ -980,6 +980,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         for (IdentityProviderEntity entity : this.realm.getIdentityProviders()) {
             if (entity.getInternalId().equals(identityProvider.getInternalId())) {
                 entity.setAlias(identityProvider.getAlias());
+                entity.setDisplayName(identityProvider.getDisplayName());
                 entity.setEnabled(identityProvider.isEnabled());
                 entity.setTrustEmail(identityProvider.isTrustEmail());
                 entity.setAuthenticateByDefault(identityProvider.isAuthenticateByDefault());
@@ -1230,7 +1231,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         }
         updateRealm();
     }
-    
+
     @Override
     public boolean isAdminEventsEnabled() {
         return realm.isAdminEventsEnabled();
@@ -1240,7 +1241,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
     public void setAdminEventsEnabled(boolean enabled) {
         realm.setAdminEventsEnabled(enabled);
         updateRealm();
-        
+
     }
 
     @Override
@@ -1253,7 +1254,7 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         realm.setAdminEventsDetailsEnabled(enabled);
         updateRealm();
     }
-    
+
     @Override
     public ClientModel getMasterAdminClient() {
         MongoClientEntity appData = getMongoStore().loadEntity(MongoClientEntity.class, realm.getMasterAdminClient(), invocationContext);
@@ -2181,4 +2182,62 @@ public class RealmAdapter extends AbstractMongoAdapter<MongoRealmEntity> impleme
         }
         return null;
     }
+
+    @Override
+    public void setAttribute(String name, String value) {
+        realm.getAttributes().put(name, value);
+        updateRealm();
+    }
+
+    @Override
+    public void setAttribute(String name, Boolean value) {
+        setAttribute(name, value.toString());
+    }
+
+    @Override
+    public void setAttribute(String name, Integer value) {
+        setAttribute(name, value.toString());
+    }
+
+    @Override
+    public void setAttribute(String name, Long value) {
+        setAttribute(name, value.toString());
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        realm.getAttributes().remove(name);
+        updateRealm();
+    }
+
+    @Override
+    public String getAttribute(String name) {
+        return realm.getAttributes().get(name);
+    }
+
+    @Override
+    public Integer getAttribute(String name, Integer defaultValue) {
+        String v = getAttribute(name);
+        return v != null ? Integer.parseInt(v) : defaultValue;
+    }
+
+    @Override
+    public Long getAttribute(String name, Long defaultValue) {
+        String v = getAttribute(name);
+        return v != null ? Long.parseLong(v) : defaultValue;
+    }
+
+    @Override
+    public Boolean getAttribute(String name, Boolean defaultValue) {
+        String v = getAttribute(name);
+        return v != null ? Boolean.parseBoolean(v) : defaultValue;
+    }
+
+    @Override
+    public Map<String, String> getAttributes() {
+        Map<String, String> attributes = new HashMap<>();
+        attributes.putAll(realm.getAttributes());
+        return attributes;
+    }
+
 }

@@ -17,26 +17,26 @@
 
 package org.keycloak.federation.ldap.mappers.msad;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.naming.AuthenticationException;
-
 import org.jboss.logging.Logger;
+import org.keycloak.credential.CredentialInput;
 import org.keycloak.federation.ldap.LDAPFederationProvider;
 import org.keycloak.federation.ldap.idm.model.LDAPObject;
 import org.keycloak.federation.ldap.idm.query.internal.LDAPQuery;
 import org.keycloak.federation.ldap.mappers.AbstractLDAPFederationMapper;
+import org.keycloak.federation.ldap.mappers.PasswordUpdated;
 import org.keycloak.models.LDAPConstants;
 import org.keycloak.models.ModelException;
 import org.keycloak.models.RealmModel;
-import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProvider;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.UserModelDelegate;
+
+import javax.naming.AuthenticationException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Mapper specific to MSAD. It's able to read the userAccountControl and pwdLastSet attributes and set actions in Keycloak based on that.
@@ -44,7 +44,7 @@ import org.keycloak.models.utils.UserModelDelegate;
  *
  * @author <a href="mailto:mposolda@redhat.com">Marek Posolda</a>
  */
-public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
+public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper implements PasswordUpdated {
 
     private static final Logger logger = Logger.getLogger(MSADUserAccountControlMapper.class);
 
@@ -53,6 +53,7 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
 
     public MSADUserAccountControlMapper(UserFederationMapperModel mapperModel, LDAPFederationProvider ldapProvider, RealmModel realm) {
         super(mapperModel, ldapProvider, realm);
+        ldapProvider.setUpdater(this);
     }
 
     @Override
@@ -66,6 +67,26 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
         if (ldapProvider.getEditMode() != UserFederationProvider.EditMode.WRITABLE) {
             query.addReturningReadOnlyLdapAttribute(LDAPConstants.USER_ACCOUNT_CONTROL);
         }
+    }
+
+    @Override
+    public void passwordUpdated(UserModel user, LDAPObject ldapUser, CredentialInput input) {
+        logger.debugf("Going to update userAccountControl for ldap user '%s' after successful password update", ldapUser.getDn().toString());
+
+        // Normally it's read-only
+        ldapUser.removeReadOnlyAttributeName(LDAPConstants.PWD_LAST_SET);
+
+        ldapUser.setSingleAttribute(LDAPConstants.PWD_LAST_SET, "-1");
+
+        UserAccountControl control = getUserAccountControl(ldapUser);
+        control.remove(UserAccountControl.PASSWD_NOTREQD);
+        control.remove(UserAccountControl.PASSWORD_EXPIRED);
+
+        if (user.isEnabled()) {
+            control.remove(UserAccountControl.ACCOUNTDISABLE);
+        }
+
+        updateUserAccountControl(ldapUser, control);
     }
 
     @Override
@@ -135,6 +156,22 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
         return e;
     }
 
+    protected UserAccountControl getUserAccountControl(LDAPObject ldapUser) {
+        String userAccountControl = ldapUser.getAttributeAsString(LDAPConstants.USER_ACCOUNT_CONTROL);
+        long longValue = userAccountControl == null ? 0 : Long.parseLong(userAccountControl);
+        return new UserAccountControl(longValue);
+    }
+
+    // Update user in LDAP
+    protected void updateUserAccountControl(LDAPObject ldapUser, UserAccountControl accountControl) {
+        String userAccountControlValue = String.valueOf(accountControl.getValue());
+        logger.debugf("Updating userAccountControl of user '%s' to value '%s'", ldapUser.getDn().toString(), userAccountControlValue);
+
+        ldapUser.setSingleAttribute(LDAPConstants.USER_ACCOUNT_CONTROL, userAccountControlValue);
+        ldapProvider.getLdapIdentityStore().update(ldapUser);
+    }
+
+
 
     public class MSADUserModelDelegate extends UserModelDelegate {
 
@@ -151,7 +188,7 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
 
             if (getPwdLastSet() > 0) {
                 // Merge KC and MSAD
-                return kcEnabled && !getUserAccountControl().has(UserAccountControl.ACCOUNTDISABLE);
+                return kcEnabled && !getUserAccountControl(ldapUser).has(UserAccountControl.ACCOUNTDISABLE);
             } else {
                 // If new MSAD user is created and pwdLastSet is still 0, MSAD account is in disabled state. So read just from Keycloak DB. User is not able to login via MSAD anyway
                 return kcEnabled;
@@ -166,44 +203,14 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
             if (ldapProvider.getEditMode() == UserFederationProvider.EditMode.WRITABLE && getPwdLastSet() > 0) {
                 logger.debugf("Going to propagate enabled=%s for ldapUser '%s' to MSAD", enabled, ldapUser.getDn().toString());
 
-                UserAccountControl control = getUserAccountControl();
+                UserAccountControl control = getUserAccountControl(ldapUser);
                 if (enabled) {
                     control.remove(UserAccountControl.ACCOUNTDISABLE);
                 } else {
                     control.add(UserAccountControl.ACCOUNTDISABLE);
                 }
 
-                updateUserAccountControl(control);
-            }
-        }
-
-        @Override
-        public void updateCredential(UserCredentialModel cred) {
-            // Update LDAP password first
-            try {
-                super.updateCredential(cred);
-            } catch (ModelException me) {
-                me = processFailedPasswordUpdateException(me);
-                throw me;
-            }
-
-            if (ldapProvider.getEditMode() == UserFederationProvider.EditMode.WRITABLE && cred.getType().equals(UserCredentialModel.PASSWORD)) {
-                logger.debugf("Going to update userAccountControl for ldap user '%s' after successful password update", ldapUser.getDn().toString());
-
-                // Normally it's read-only
-                ldapUser.removeReadOnlyAttributeName(LDAPConstants.PWD_LAST_SET);
-
-                ldapUser.setSingleAttribute(LDAPConstants.PWD_LAST_SET, "-1");
-
-                UserAccountControl control = getUserAccountControl();
-                control.remove(UserAccountControl.PASSWD_NOTREQD);
-                control.remove(UserAccountControl.PASSWORD_EXPIRED);
-
-                if (super.isEnabled()) {
-                    control.remove(UserAccountControl.ACCOUNTDISABLE);
-                }
-
-                updateUserAccountControl(control);
+                updateUserAccountControl(ldapUser, control);
             }
         }
 
@@ -243,7 +250,7 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
             if (ldapProvider.getEditMode() == UserFederationProvider.EditMode.WRITABLE && RequiredAction.UPDATE_PASSWORD.toString().equals(action)) {
 
                 // Don't set pwdLastSet in MSAD when it is new user
-                UserAccountControl accountControl = getUserAccountControl();
+                UserAccountControl accountControl = getUserAccountControl(ldapUser);
                 if (accountControl.getValue() != 0 && !accountControl.has(UserAccountControl.PASSWD_NOTREQD)) {
                     logger.debugf("Going to remove required action UPDATE_PASSWORD from MSAD for ldap user '%s' ", ldapUser.getDn().toString());
 
@@ -261,7 +268,7 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
             Set<String> requiredActions = super.getRequiredActions();
 
             if (ldapProvider.getEditMode() == UserFederationProvider.EditMode.WRITABLE) {
-                if (getPwdLastSet() == 0 || getUserAccountControl().has(UserAccountControl.PASSWORD_EXPIRED)) {
+                if (getPwdLastSet() == 0 || getUserAccountControl(ldapUser).has(UserAccountControl.PASSWORD_EXPIRED)) {
                     requiredActions = new HashSet<>(requiredActions);
                     requiredActions.add(RequiredAction.UPDATE_PASSWORD.toString());
                     return requiredActions;
@@ -276,20 +283,7 @@ public class MSADUserAccountControlMapper extends AbstractLDAPFederationMapper {
             return pwdLastSet == null ? 0 : Long.parseLong(pwdLastSet);
         }
 
-        protected UserAccountControl getUserAccountControl() {
-            String userAccountControl = ldapUser.getAttributeAsString(LDAPConstants.USER_ACCOUNT_CONTROL);
-            long longValue = userAccountControl == null ? 0 : Long.parseLong(userAccountControl);
-            return new UserAccountControl(longValue);
-        }
 
-        // Update user in LDAP
-        protected void updateUserAccountControl(UserAccountControl accountControl) {
-            String userAccountControlValue = String.valueOf(accountControl.getValue());
-            logger.debugf("Updating userAccountControl of user '%s' to value '%s'", ldapUser.getDn().toString(), userAccountControlValue);
-
-            ldapUser.setSingleAttribute(LDAPConstants.USER_ACCOUNT_CONTROL, userAccountControlValue);
-            ldapProvider.getLdapIdentityStore().update(ldapUser);
-        }
     }
 
 }

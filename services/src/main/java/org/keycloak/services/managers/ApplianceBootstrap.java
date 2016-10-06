@@ -19,7 +19,13 @@ package org.keycloak.services.managers;
 import org.keycloak.Config;
 import org.keycloak.common.Version;
 import org.keycloak.common.enums.SslRequired;
-import org.keycloak.models.*;
+import org.keycloak.models.AdminRoles;
+import org.keycloak.models.Constants;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleModel;
+import org.keycloak.models.UserCredentialModel;
+import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.services.ServicesLogger;
@@ -96,7 +102,7 @@ public class ApplianceBootstrap {
         UserCredentialModel usrCredModel = new UserCredentialModel();
         usrCredModel.setType(UserCredentialModel.PASSWORD);
         usrCredModel.setValue(password);
-        session.users().updateCredential(realm, adminUser, usrCredModel);
+        session.userCredentialManager().updateCredential(realm, adminUser, usrCredModel);
 
         RoleModel adminRole = realm.getRole(AdminRoles.ADMIN);
         adminUser.grantRole(adminRole);

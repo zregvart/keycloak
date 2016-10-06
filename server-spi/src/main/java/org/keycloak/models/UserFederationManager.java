@@ -20,12 +20,9 @@ package org.keycloak.models;
 import org.jboss.logging.Logger;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
-import org.keycloak.policy.PasswordPolicyManagerProvider;
-import org.keycloak.policy.PolicyError;
 import org.keycloak.services.managers.UserManager;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -57,10 +54,6 @@ public class UserFederationManager implements UserProvider {
         return registerWithFederation(realm, user);
     }
 
-    protected UserFederationProvider getFederationProvider(UserFederationProviderModel model) {
-        return KeycloakModelUtils.getFederationProviderInstance(session, model);
-    }
-
     @Override
     public UserModel addUser(RealmModel realm, String username) {
         UserModel user = session.userStorage().addUser(realm, username.toLowerCase());
@@ -80,7 +73,11 @@ public class UserFederationManager implements UserProvider {
         return user;
     }
 
-    protected UserFederationProvider getFederationLink(RealmModel realm, UserModel user) {
+    public UserFederationProvider getFederationProvider(UserFederationProviderModel model) {
+        return KeycloakModelUtils.getFederationProviderInstance(session, model);
+    }
+
+    public UserFederationProvider getFederationLink(RealmModel realm, UserModel user) {
         if (user.getFederationLink() == null) return null;
         for (UserFederationProviderModel fed : realm.getUserFederationProviders()) {
             if (fed.getId().equals(user.getFederationLink())) {
@@ -111,7 +108,7 @@ public class UserFederationManager implements UserProvider {
 
     }
 
-    protected void validateUser(RealmModel realm, UserModel user) {
+    public void validateUser(RealmModel realm, UserModel user) {
         if (managedUsers.containsKey(user.getId())) {
             return;
         }
@@ -487,120 +484,9 @@ public class UserFederationManager implements UserProvider {
         session.userStorage().preRemove(protocolMapper);
     }
 
-    public void updateCredential(RealmModel realm, UserModel user, UserCredentialModel credential) {
-        if (credential.getType().equals(UserCredentialModel.PASSWORD)) {
-            if (realm.getPasswordPolicy() != null) {
-                PolicyError error = session.getProvider(PasswordPolicyManagerProvider.class).validate(user, credential.getValue());
-                if (error != null) throw new ModelException(error.getMessage(), error.getParameters());
-            }
-        }
-        user.updateCredential(credential);
-    }
-
-    @Override
-    public boolean validCredentials(KeycloakSession session, RealmModel realm, UserModel user, List<UserCredentialModel> input) {
-        UserFederationProvider link = getFederationLink(realm, user);
-        if (link != null) {
-            validateUser(realm, user);
-            Set<String> supportedCredentialTypes = link.getSupportedCredentialTypes(user);
-            if (supportedCredentialTypes.size() > 0) {
-                List<UserCredentialModel> fedCreds = new ArrayList<UserCredentialModel>();
-                List<UserCredentialModel> localCreds = new ArrayList<UserCredentialModel>();
-                for (UserCredentialModel cred : input) {
-                    if (supportedCredentialTypes.contains(cred.getType())) {
-                        fedCreds.add(cred);
-                    } else {
-                        localCreds.add(cred);
-                    }
-                }
-                if (!link.validCredentials(realm, user, fedCreds)) {
-                    return false;
-                }
-                return session.userStorage().validCredentials(session, realm, user, localCreds);
-            }
-        }
-        return session.userStorage().validCredentials(session, realm, user, input);
-    }
-
-    /**
-     * Is the user configured to use this credential type
-     *
-     * @return
-     */
-    public boolean configuredForCredentialType(String type, RealmModel realm, UserModel user) {
-        UserFederationProvider link = getFederationLink(realm, user);
-        if (link != null) {
-            Set<String> supportedCredentialTypes = link.getSupportedCredentialTypes(user);
-            if (supportedCredentialTypes.contains(type)) return true;
-        }
-        if (UserCredentialModel.isOtp(type)) {
-            if (!user.isOtpEnabled()) return false;
-        }
-
-        List<UserCredentialValueModel> creds = user.getCredentialsDirectly();
-        for (UserCredentialValueModel cred : creds) {
-            if (cred.getType().equals(type)) {
-                if (UserCredentialModel.isOtp(type)) {
-                    OTPPolicy otpPolicy = realm.getOTPPolicy();
-                    if (!cred.getAlgorithm().equals(otpPolicy.getAlgorithm())
-                        || cred.getDigits() != otpPolicy.getDigits()) {
-                        return false;
-                    }
-                    if (type.equals(UserCredentialModel.TOTP) && cred.getPeriod() != otpPolicy.getPeriod()) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
-
-
-
-
-    @Override
-    public boolean validCredentials(KeycloakSession session, RealmModel realm, UserModel user, UserCredentialModel... input) {
-        return validCredentials(session, realm, user, Arrays.asList(input));
-    }
-
-    @Override
-    public CredentialValidationOutput validCredentials(KeycloakSession session, RealmModel realm, UserCredentialModel... input) {
-        List<UserFederationProviderModel> fedProviderModels = realm.getUserFederationProviders();
-        List<UserFederationProvider> fedProviders = new ArrayList<UserFederationProvider>();
-        for (UserFederationProviderModel fedProviderModel : fedProviderModels) {
-            fedProviders.add(getFederationProvider(fedProviderModel));
-        }
-
-        CredentialValidationOutput result = null;
-        for (UserCredentialModel cred : input) {
-            UserFederationProvider providerSupportingCreds = null;
-
-            // Find first provider, which supports required credential type
-            for (UserFederationProvider fedProvider : fedProviders) {
-                if (fedProvider.getSupportedCredentialTypes().contains(cred.getType())) {
-                    providerSupportingCreds = fedProvider;
-                    break;
-                }
-            }
-
-            if (providerSupportingCreds == null) {
-                logger.warn("Don't have provider supporting credentials of type " + cred.getType());
-                return CredentialValidationOutput.failed();
-            }
-
-            logger.debug("Found provider [" + providerSupportingCreds + "] supporting credentials of type " + cred.getType());
-            CredentialValidationOutput currentResult = providerSupportingCreds.validCredentials(realm, cred);
-            result = (result == null) ? currentResult : result.merge(currentResult);
-        }
-
-        // For now, validCredentials(realm, input) is not supported for local userProviders
-        return (result != null) ? result : CredentialValidationOutput.failed();
-    }
-
     @Override
     public void preRemove(RealmModel realm, ComponentModel component) {
+        session.userStorage().preRemove(realm, component);
 
     }
 

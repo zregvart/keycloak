@@ -26,10 +26,10 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 import org.junit.runners.MethodSorters;
 import org.keycloak.OAuth2Constants;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.federation.ldap.LDAPConfig;
 import org.keycloak.federation.ldap.LDAPFederationProvider;
 import org.keycloak.federation.ldap.LDAPFederationProviderFactory;
-import org.keycloak.federation.ldap.LDAPUtils;
 import org.keycloak.federation.ldap.idm.model.LDAPObject;
 import org.keycloak.federation.ldap.mappers.FullNameLDAPFederationMapper;
 import org.keycloak.federation.ldap.mappers.FullNameLDAPFederationMapperFactory;
@@ -43,7 +43,6 @@ import org.keycloak.models.ModelReadOnlyException;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserCredentialModel;
-import org.keycloak.models.UserCredentialValueModel;
 import org.keycloak.models.UserFederationMapperModel;
 import org.keycloak.models.UserFederationProvider;
 import org.keycloak.models.UserFederationProviderModel;
@@ -687,7 +686,7 @@ public class FederationProvidersIntegrationTest {
             }
             try {
                 UserCredentialModel cred = UserCredentialModel.password("PoopyPoop1");
-                user.updateCredential(cred);
+                session.userCredentialManager().updateCredential(appRealm, user, cred);
                 Assert.fail("should fail");
             } catch (ModelReadOnlyException e) {
 
@@ -818,10 +817,10 @@ public class FederationProvidersIntegrationTest {
             Assert.assertEquals(user.getFederationLink(), ldapModel.getId());
 
             UserCredentialModel cred = UserCredentialModel.password("Candycand1");
-            user.updateCredential(cred);
-            UserCredentialValueModel userCredentialValueModel = user.getCredentialsDirectly().get(0);
+            session.userCredentialManager().updateCredential(appRealm, user, cred);
+            CredentialModel userCredentialValueModel = session.userCredentialManager().getStoredCredentialsByType(appRealm, user, CredentialModel.PASSWORD).get(0);
             Assert.assertEquals(UserCredentialModel.PASSWORD, userCredentialValueModel.getType());
-            Assert.assertTrue(session.users().validCredentials(session, appRealm, user, cred));
+            Assert.assertTrue(session.userCredentialManager().isValid(appRealm, user, cred));
 
             // LDAP password is still unchanged
             LDAPFederationProvider ldapProvider = FederationTestUtils.getLdapProvider(session, model);

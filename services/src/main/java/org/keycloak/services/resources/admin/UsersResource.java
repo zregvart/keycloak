@@ -20,8 +20,10 @@ import org.jboss.resteasy.annotations.cache.NoCache;
 import org.jboss.resteasy.spi.BadRequestException;
 import org.jboss.resteasy.spi.NotFoundException;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
-import org.keycloak.common.ClientConnection;
 import org.keycloak.authentication.RequiredActionProvider;
+import org.keycloak.common.ClientConnection;
+import org.keycloak.common.util.Time;
+import org.keycloak.credential.CredentialModel;
 import org.keycloak.email.EmailException;
 import org.keycloak.email.EmailTemplateProvider;
 import org.keycloak.events.Details;
@@ -42,6 +44,7 @@ import org.keycloak.models.ModelReadOnlyException;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserConsentModel;
 import org.keycloak.models.UserCredentialModel;
+import org.keycloak.models.UserLoginFailureModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.ModelToRepresentation;
@@ -55,13 +58,17 @@ import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.UserConsentRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.representations.idm.UserSessionRepresentation;
-import org.keycloak.services.ErrorResponseException;
-import org.keycloak.services.managers.AuthenticationManager;
-import org.keycloak.services.managers.ClientSessionCode;
-import org.keycloak.services.managers.UserManager;
 import org.keycloak.services.ErrorResponse;
+import org.keycloak.services.ErrorResponseException;
 import org.keycloak.services.ServicesLogger;
 import org.keycloak.services.Urls;
+import org.keycloak.services.managers.AuthenticationManager;
+import org.keycloak.services.managers.BruteForceProtector;
+import org.keycloak.services.managers.ClientSessionCode;
+import org.keycloak.services.managers.UserManager;
+import org.keycloak.services.managers.UserSessionManager;
+import org.keycloak.services.resources.AccountService;
+import org.keycloak.services.validation.Validation;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -72,6 +79,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -79,8 +87,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
-import javax.ws.rs.WebApplicationException;
-
 import java.net.URI;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -93,14 +99,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.keycloak.models.UserLoginFailureModel;
-import org.keycloak.services.managers.BruteForceProtector;
-import org.keycloak.services.managers.UserSessionManager;
-import org.keycloak.services.resources.AccountService;
-import org.keycloak.common.util.Time;
-import org.keycloak.services.validation.Validation;
-
-import static org.keycloak.events.admin.ResourceType.GROUP_MEMBERSHIP;
 
 /**
  * Base resource for managing users
@@ -184,6 +182,8 @@ public class UsersResource {
             return ErrorResponse.exists("User is read only!");
         } catch (ModelException me) {
             return ErrorResponse.exists("Could not update user!");
+        } catch (Exception me) { // JPA may be committed by JTA which can't 
+            return ErrorResponse.exists("Could not update user!");
         }
     }
 
@@ -243,7 +243,6 @@ public class UsersResource {
         if (rep.getLastName() != null) user.setLastName(rep.getLastName());
 
         if (rep.isEnabled() != null) user.setEnabled(rep.isEnabled());
-        if (rep.isTotp() != null) user.setOtpEnabled(rep.isTotp());
         if (rep.isEmailVerified() != null) user.setEmailVerified(rep.isEmailVerified());
 
         List<String> reqActions = rep.getRequiredActions();
@@ -291,7 +290,7 @@ public class UsersResource {
             throw new NotFoundException("User not found");
         }
 
-        UserRepresentation rep = ModelToRepresentation.toRepresentation(user);
+        UserRepresentation rep = ModelToRepresentation.toRepresentation(session, realm, user);
 
         if (realm.isIdentityFederationEnabled()) {
             List<FederatedIdentityRepresentation> reps = getFederatedIdentities(user);
@@ -690,7 +689,7 @@ public class UsersResource {
         }
 
         for (UserModel user : userModels) {
-            results.add(ModelToRepresentation.toRepresentation(user));
+            results.add(ModelToRepresentation.toRepresentation(session, realm, user));
         }
         return results;
     }
@@ -744,7 +743,7 @@ public class UsersResource {
 
         UserCredentialModel cred = RepresentationToModel.convertCredential(pass);
         try {
-            session.users().updateCredential(realm, user, cred);
+            session.userCredentialManager().updateCredential(realm, user, cred);
         } catch (IllegalStateException ise) {
             throw new BadRequestException("Resetting to N old passwords is not allowed.");
         } catch (ModelReadOnlyException mre) {
@@ -775,7 +774,7 @@ public class UsersResource {
             throw new NotFoundException("User not found");
         }
 
-        user.setOtpEnabled(false);
+        session.userCredentialManager().disableCredential(realm, user, CredentialModel.OTP);
         adminEvent.operation(OperationType.ACTION).resourcePath(uriInfo).success();
     }
 
