@@ -105,24 +105,13 @@ public class ValidateX509CertificateThumbprint extends AbstractDirectGrantAuthen
             return;
         }
 
-        UserCredentialValueModel cred = null;
-        for (UserCredentialValueModel model : context.getUser().getCredentialsDirectly()) {
-            if (model.getType().equals(CREDENTIAL_TYPE)) {
-                cred = model;
-                break;
-            }
-        }
-        if (cred == null) {
-            logger.errorf("[ValidateX509CertificateThumbprint:authenticate] Unable to find X509 certificate based credentials. Set up the X509 based user credentials first.");
-            context.getEvent().user(context.getUser());
-            context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
-            Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_grant", "X509 user credentials have not been set up.");
-            context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
-            return;
-        }
-
         String signature = computeDigest(certs);
-        if (!cred.getValue().equals(signature)) {
+
+        UserCredentialModel model = new UserCredentialModel();
+        model.setType(CREDENTIAL_TYPE);
+        model.setValue(signature);
+        boolean valid = context.getSession().userCredentialManager().isValid(context.getRealm(), context.getUser(), model);
+        if (!valid) {
             logger.errorf("[ValidateX509CertificateThumbprint:authenticate] The user certificate does not match the provided client certificate.");
             context.getEvent().user(context.getUser());
             context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
