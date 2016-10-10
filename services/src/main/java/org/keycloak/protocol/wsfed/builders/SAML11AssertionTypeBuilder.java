@@ -46,7 +46,7 @@ public class SAML11AssertionTypeBuilder {
 
     private static final String ATTRIBUTE_NAMESPACE = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims";
 
-    private final static long CLOCK_SKEW = 2000; // in milliseconds
+    public final static long CLOCK_SKEW = 2000; // in milliseconds
 
     protected String requestID;
     protected String issuer;

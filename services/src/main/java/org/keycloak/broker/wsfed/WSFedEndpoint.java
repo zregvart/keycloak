@@ -107,8 +107,7 @@ public class WSFedEndpoint {
     }
 
 
-
-    protected PublicKey getIDPKey() throws ProcessingException, ConfigurationException {
+    public PublicKey getIDPKey() throws ProcessingException, ConfigurationException {
         X509Certificate certificate = null;
         try {
             certificate = XMLSignatureUtil.getX509CertificateFromKeyInfoString(config.getSigningCertificate().replaceAll("\\s", ""));
@@ -118,10 +117,10 @@ public class WSFedEndpoint {
         return certificate.getPublicKey();
     }
 
-    protected Response execute(String wsfedAction, String wsfedResult, String context) {
+    public Response execute(String wsfedAction, String wsfedResult, String context) {
         event = new EventBuilder(realm, session, clientConnection);
 
-        if(wsfedAction == null && config.handleEmptyActionAsLogout()) {
+        if (wsfedAction == null && config.handleEmptyActionAsLogout()) {
             return handleSignoutResponse(context);
         }
 
@@ -130,13 +129,14 @@ public class WSFedEndpoint {
         if (response != null) return response;
         if (wsfedResult != null) return handleWsFedResponse(wsfedResult, context);
         if (wsfedAction.compareTo(WSFedConstants.WSFED_SIGNOUT_ACTION) == 0) return handleSignoutRequest(context);
-        if (wsfedAction.compareTo(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION) == 0) return handleSignoutResponse(context);
+        if (wsfedAction.compareTo(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION) == 0)
+            return handleSignoutResponse(context);
 
         return ErrorPage.error(session, Messages.INVALID_REQUEST);
     }
 
-    protected Response handleSignoutRequest(String context) {
-        AuthenticationManager.AuthResult result = authMgr.authenticateIdentityCookie(session, realm);
+    public Response handleSignoutRequest(String context) {
+        AuthenticationManager.AuthResult result = authenticateIdentityCookie(session, realm);
 
         if (result == null || result.getSession() == null) {
             logger.error("no valid user session");
@@ -169,8 +169,8 @@ public class WSFedEndpoint {
         return builder.buildResponse(null);
     }
 
-    protected Response handleSignoutResponse(String context) {
-        AuthenticationManager.AuthResult result = authMgr.authenticateIdentityCookie(session, realm);
+    public Response handleSignoutResponse(String context) {
+        AuthenticationManager.AuthResult result = authenticateIdentityCookie(session, realm);
 
         if (result == null || result.getSession() == null) {
             logger.error("no valid user session");
@@ -191,7 +191,7 @@ public class WSFedEndpoint {
         return AuthenticationManager.finishBrowserLogout(session, realm, userSession, uriInfo, clientConnection, headers);
     }
 
-    protected Response handleLoginResponse(String wsfedResponse, RequestedToken token, String context) throws IdentityBrokerException {
+    public Response handleLoginResponse(String wsfedResponse, RequestedToken token, String context) throws IdentityBrokerException {
         try {
             BrokeredIdentityContext identity = new BrokeredIdentityContext(token.getId());
             identity.setCode(context);
@@ -222,39 +222,36 @@ public class WSFedEndpoint {
         }
     }
 
-    protected Response handleWsFedResponse(String wsfedResponse, String context) {
+    public Response handleWsFedResponse(String wsfedResponse, String context) {
 
         logger.debugf("wsfedResponse: {0}", wsfedResponse);
         try {
             RequestSecurityTokenResponse rstr = getWsfedToken(wsfedResponse);
-            if(hasExpired(rstr)) {
+            if (hasExpired(rstr)) {
                 event.event(EventType.IDENTITY_PROVIDER_RESPONSE);
                 event.error(Errors.EXPIRED_CODE);
                 return ErrorPage.error(session, Messages.INVALID_FEDERATED_IDENTITY_ACTION);
             }
 
-           //TODO: Do we need to handle if the IDP sent back more than one token?
+            //TODO: Do we need to handle if the IDP sent back more than one token?
             Object rt = rstr.getRequestedSecurityToken().getAny().get(0);
             RequestedToken token = null;
 
-            if(rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:2.0:assertion")) == 0 ||
+            if (rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:2.0:assertion")) == 0 ||
                     rstr.getTokenType().compareTo(URI.create("http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0")) == 0) {
                 token = new SAML2RequestedToken(wsfedResponse, rt, realm);
-            }
-            else if(rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:1.0:assertion")) == 0) {
+            } else if (rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:1.0:assertion")) == 0) {
                 token = new SAML11RequestedToken(wsfedResponse, rt, realm);
-            }
-            else if(rstr.getTokenType().compareTo(URI.create("urn:ietf:params:oauth:token-type:jwt")) == 0) {
+            } else if (rstr.getTokenType().compareTo(URI.create("urn:ietf:params:oauth:token-type:jwt")) == 0) {
                 throw new NotImplementedException("We don't currently support a token type of urn:ietf:params:oauth:token-type:jwt");
-            }
-            else {
+            } else {
                 throw new NotImplementedException("We don't currently support a token type of " + rstr.getTokenType().toString());
             }
 
             if (config.isValidateSignature()) {
                 Response response = token.validate(getIDPKey(), config, event, session);
 
-                if(response != null) {
+                if (response != null) {
                     return response;
                 }
             }
@@ -268,7 +265,7 @@ public class WSFedEndpoint {
         }
     }
 
-    protected boolean hasExpired(RequestSecurityTokenResponse rstr) throws ConfigurationException, DatatypeConfigurationException {
+    public boolean hasExpired(RequestSecurityTokenResponse rstr) throws ConfigurationException, DatatypeConfigurationException {
         boolean expiry = false;
         Lifetime lifetime = rstr.getLifetime();
         if (lifetime != null) {
@@ -297,8 +294,9 @@ public class WSFedEndpoint {
         return expiry;
     }
 
-    protected RequestSecurityTokenResponse getWsfedToken(String wsfedResponse) throws ParsingException, IOException {
-        if(StringUtil.isNullOrEmpty(wsfedResponse)) {
+    // Tests need the method so need to keep it public
+    public RequestSecurityTokenResponse getWsfedToken(String wsfedResponse) throws ParsingException, IOException {
+        if (StringUtil.isNullOrEmpty(wsfedResponse)) {
             throw new ParsingException("WSFed response was null");
         }
 
@@ -311,11 +309,10 @@ public class WSFedEndpoint {
             Object response = parser.parse(bis);
             RequestSecurityTokenResponse rstr = null;
 
-            if(response instanceof RequestSecurityTokenResponse) {
+            if (response instanceof RequestSecurityTokenResponse) {
                 rstr = (RequestSecurityTokenResponse) response;
-            }
-            else if(response instanceof RequestSecurityTokenResponseCollection) {
-                RequestSecurityTokenResponseCollection rstrCollection = (RequestSecurityTokenResponseCollection)response;
+            } else if (response instanceof RequestSecurityTokenResponseCollection) {
+                RequestSecurityTokenResponseCollection rstrCollection = (RequestSecurityTokenResponseCollection) response;
                 List<RequestSecurityTokenResponse> responses = rstrCollection.getRequestSecurityTokenResponses();
                 //RequestSecurityTokenResponseCollection must contain at least one RequestSecurityTokenResponse per the spec
                 //TODO: For our needs this should never be more than a single response. But what to do if it for some reason was?
@@ -323,17 +320,19 @@ public class WSFedEndpoint {
             }
 
             return rstr;
-        }
-        catch(org.picketlink.common.exceptions.ParsingException ex) {
+        } catch (org.picketlink.common.exceptions.ParsingException ex) {
             throw new ParsingException(ex);
-        }
-        catch(Exception ex) {
+        } catch (Exception ex) {
             throw new ParsingException(ex);
-        }
-        finally {
-            if(bis != null) {
+        } finally {
+            if (bis != null) {
                 bis.close();
             }
         }
     }
+
+    public AuthenticationManager.AuthResult authenticateIdentityCookie(KeycloakSession session, RealmModel realm) {
+        return authMgr.authenticateIdentityCookie(session,realm);
+    }
+
 }

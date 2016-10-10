@@ -124,7 +124,7 @@ public class WSFedService {
 
     }
 
-    protected Response basicChecks(WSFedProtocolParameters params) {
+    public Response basicChecks(WSFedProtocolParameters params) {
         AuthenticationManager.AuthResult authResult = authenticateIdentityCookie();
 
         if (!checkSsl()) {
@@ -169,13 +169,13 @@ public class WSFedService {
         return null;
     }
 
-    protected boolean isSignout(WSFedProtocolParameters params) {
+    public boolean isSignout(WSFedProtocolParameters params) {
         return params.getWsfed_action().compareTo(WSFedConstants.WSFED_SIGNOUT_ACTION) == 0 ||
                 params.getWsfed_action().compareTo(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION) == 0 ||
                 params.getWsfed_action().compareTo(UserSessionModel.State.LOGGING_OUT.toString()) == 0;
     }
 
-    protected Response clientChecks(ClientModel client, WSFedProtocolParameters params) {
+    public Response clientChecks(ClientModel client, WSFedProtocolParameters params) {
         if(isSignout(params)) {
             return null; //client checks not required for logout
         }
@@ -195,12 +195,6 @@ public class WSFedService {
             event.error(Errors.NOT_ALLOWED);
             return ErrorPage.error(session, Messages.BEARER_ONLY);
         }
-        if (!client.isStandardFlowEnabled()) {
-            event.event(EventType.LOGIN);
-            event.error(Errors.NOT_ALLOWED);
-            return ErrorPage.error(session, Messages.STANDARD_FLOW_DISABLED);
-        }
-
         session.getContext().setClient(client);
 
         return null;
@@ -249,7 +243,7 @@ public class WSFedService {
         }
     }
 
-    protected Response handleLoginRequest(WSFedProtocolParameters params, ClientModel client) {
+    public Response handleLoginRequest(WSFedProtocolParameters params, ClientModel client) {
         logger.debug("** login request");
         event.event(EventType.LOGIN);
 
@@ -288,7 +282,7 @@ public class WSFedService {
                 .build();
     }
 
-    protected Response newBrowserAuthentication(ClientSessionModel clientSession) {
+    public Response newBrowserAuthentication(ClientSessionModel clientSession) {
         List<IdentityProviderModel> identityProviders = realm.getIdentityProviders();
         for (IdentityProviderModel identityProvider : identityProviders) {
             if (identityProvider.isAuthenticateByDefault()) {
@@ -317,7 +311,7 @@ public class WSFedService {
         }
     }
 
-    protected Response handleLogoutRequest(WSFedProtocolParameters params, ClientModel client) {
+    public Response handleLogoutRequest(WSFedProtocolParameters params, ClientModel client) {
         //We either need a client or a reply address to make this work
         if (client == null && params.getWsfed_reply() == null) {
             event.event(EventType.LOGIN);
@@ -362,7 +356,7 @@ public class WSFedService {
         return builder.buildResponse(null);
     }
 
-    protected Response handleLogoutResponse(WSFedProtocolParameters params, ClientModel client) {
+    public Response handleLogoutResponse(WSFedProtocolParameters params, ClientModel client) {
         AuthenticationManager.AuthResult authResult = authenticateIdentityCookie();
         if (authResult == null) {
             logger.warn("Unknown ws-fed response.");
@@ -391,7 +385,7 @@ public class WSFedService {
      * The only purpose of this method is to allow us to unit test this class
      * @return
      */
-    protected AuthenticationManager.AuthResult authenticateIdentityCookie() {
+    public AuthenticationManager.AuthResult authenticateIdentityCookie() {
         return authManager.authenticateIdentityCookie(session, realm, false);
     }
 
@@ -402,4 +396,4 @@ public class WSFedService {
             return !realm.getSslRequired().isRequired(clientConnection);
         }
     }
-}
+ }

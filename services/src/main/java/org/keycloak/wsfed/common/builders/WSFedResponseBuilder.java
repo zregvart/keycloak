@@ -139,7 +139,7 @@ public class WSFedResponseBuilder {
         return builder.toString();
     }
 
-    protected static String escapeAttribute(String s) {
+    public static String escapeAttribute(String s) {
         StringBuffer out = new StringBuffer();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);

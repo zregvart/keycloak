@@ -46,12 +46,11 @@ public interface RequestedToken {
 
     String getSessionIndex();
 
-    default public Document createXmlDocument(String response) throws ProcessingException, ParserConfigurationException {
+    default Document createXmlDocument(String response) throws ProcessingException, ParserConfigurationException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
-        DocumentBuilder builder = null;
+        DocumentBuilder builder = factory.newDocumentBuilder();
 
-        builder = factory.newDocumentBuilder();
         InputSource source = new InputSource();
         source.setCharacterStream(new StringReader(response));
         try {
@@ -63,7 +62,7 @@ public interface RequestedToken {
         }
     }
 
-    default public Document extractSamlDocument(Document document) throws ProcessingException {
+    default Document extractSamlDocument(Document document) throws ProcessingException {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);

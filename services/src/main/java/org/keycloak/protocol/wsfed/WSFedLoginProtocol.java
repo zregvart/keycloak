@@ -160,10 +160,12 @@ public class WSFedLoginProtocol implements LoginProtocol {
                 WsFedSAMLAssertionTokenFormat tokenFormat = getSamlAssertionTokenFormat(client);
                 switch(tokenFormat) {
                     case SAML20_ASSERTION_TOKEN_FORMAT:
-                        buildSAML20AssertionToken(userSession, accessCode, clientSession, builder);
+                        AssertionType saml20Token = buildSAML20AssertionToken(userSession, accessCode, clientSession);
+                        builder.setSamlToken(saml20Token);
                         break;
                     case SAML11_ASSERTION_TOKEN_FORMAT:
-                        buildSAML11AssertionToken(userSession, accessCode, clientSession, builder);
+                        SAML11AssertionType saml11Token = buildSAML11AssertionToken(userSession, accessCode, clientSession);
+                        builder.setSaml11Token(saml11Token);
                         break;
                 }
             }
@@ -175,7 +177,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
         }
     }
 
-    private void buildSAML11AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession, RequestSecurityTokenResponseBuilder builder) throws DatatypeConfigurationException, ConfigurationException, ProcessingException {
+    private SAML11AssertionType buildSAML11AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession) throws DatatypeConfigurationException, ConfigurationException, ProcessingException {
         WsFedSAML11AssertionTypeBuilder samlBuilder = new WsFedSAML11AssertionTypeBuilder();
         samlBuilder.setRealm(realm)
                 .setUriInfo(uriInfo)
@@ -183,11 +185,10 @@ public class WSFedLoginProtocol implements LoginProtocol {
                 .setClientSession(clientSession)
                 .setUserSession(userSession)
                 .setSession(session);
-        SAML11AssertionType token = samlBuilder.build();
-        builder.setSaml11Token(token);
+        return samlBuilder.build();
     }
 
-    private void buildSAML20AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession, RequestSecurityTokenResponseBuilder builder) throws ConfigurationException, ProcessingException, DatatypeConfigurationException {
+    private AssertionType buildSAML20AssertionToken(UserSessionModel userSession, ClientSessionCode accessCode, ClientSessionModel clientSession) throws ConfigurationException, ProcessingException, DatatypeConfigurationException {
         WSFedSAML2AssertionTypeBuilder samlBuilder = new WSFedSAML2AssertionTypeBuilder();
         samlBuilder.setRealm(realm)
             .setUriInfo(uriInfo)
@@ -195,8 +196,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
             .setClientSession(clientSession)
             .setUserSession(userSession)
             .setSession(session);
-        AssertionType token = samlBuilder.build();
-        builder.setSamlToken(token);
+        return samlBuilder.build();
     }
 
     @Override
@@ -205,15 +205,15 @@ public class WSFedLoginProtocol implements LoginProtocol {
         return getErrorResponse(clientSession, error.toString());
     }
 
-    protected boolean useJwt(ClientModel client) {
+    public boolean useJwt(ClientModel client) {
         return Boolean.parseBoolean(client.getAttribute(WSFED_JWT));
     }
 
-    protected boolean isX5tIncluded(ClientModel client) {
+    public boolean isX5tIncluded(ClientModel client) {
         return Boolean.parseBoolean(client.getAttribute(WSFED_X5T));
     }
 
-    protected WsFedSAMLAssertionTokenFormat getSamlAssertionTokenFormat(ClientModel client) {
+    public WsFedSAMLAssertionTokenFormat getSamlAssertionTokenFormat(ClientModel client) {
         String value = client.getAttribute(WSFED_SAML_ASSERTION_TOKEN_FORMAT);
         try {
             if (value != null)
@@ -235,7 +235,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
     public void backchannelLogout(UserSessionModel userSession, ClientSessionModel clientSession) {
         logger.debug("backchannelLogout");
         ClientModel client = clientSession.getClient();
-        String logoutUrl = RedirectUtils.verifyRedirectUri(uriInfo, null, realm, client);
+        String logoutUrl = RedirectUtils.verifyRedirectUri(uriInfo, client.getBaseUrl(), realm, client);
         if (logoutUrl == null) {
             logger.warnv("Can't do backchannel logout. No SingleLogoutService POST Binding registered for client: {1}", client.getClientId());
             return;
@@ -280,7 +280,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
     public Response frontchannelLogout(UserSessionModel userSession, ClientSessionModel clientSession) {
         logger.debug("frontchannelLogout");
         ClientModel client = clientSession.getClient();
-        String logoutUrl = RedirectUtils.verifyRedirectUri(uriInfo, null, realm, client);
+        String logoutUrl = RedirectUtils.verifyRedirectUri(uriInfo, client.getBaseUrl(), realm, client);
         if (logoutUrl == null) {
             logger.error("Can't finish WS-Fed logout as there is no logout binding set. Has the redirect URI being used been added to the valid redirect URIs in the client?");
             return ErrorPage.error(session, Messages.FAILED_LOGOUT);
@@ -323,7 +323,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
 
     }
 
-    protected String getEndpoint(UriInfo uriInfo, RealmModel realm) {
+    public String getEndpoint(UriInfo uriInfo, RealmModel realm) {
         return uriInfo.getBaseUriBuilder()
                 .path("realms").path(realm.getName())
                 .path("protocol")

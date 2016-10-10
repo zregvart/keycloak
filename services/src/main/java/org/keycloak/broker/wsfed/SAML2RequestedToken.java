@@ -148,7 +148,8 @@ public class SAML2RequestedToken implements RequestedToken {
         return null;
     }
 
-    protected NameIDType getSubjectNameID() {
+    // Tests need the method so need to keep it public
+    public NameIDType getSubjectNameID() {
         if (subjectNameID == null) {
             SubjectType subject = saml2Assertion.getSubject();
             SubjectType.STSubType subType = subject.getSubType();
