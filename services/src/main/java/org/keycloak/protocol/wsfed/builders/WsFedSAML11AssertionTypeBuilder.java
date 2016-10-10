@@ -37,25 +37,53 @@ import org.keycloak.protocol.wsfed.mappers.WSFedSAMLRoleListMapper;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.saml.common.exceptions.ConfigurationException;
 import org.keycloak.saml.common.exceptions.ProcessingException;
-import org.picketlink.identity.federation.core.wstrust.plugins.saml.SAMLUtil;
 
 import javax.xml.datatype.DatatypeConfigurationException;
 import java.net.URI;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
- * @date 10/4/2016
+ * @since 10/4/2016
  */
 
 public class WsFedSAML11AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstractBuilder<WsFedSAML11AssertionTypeBuilder> {
 
+    // TODO eventually make the attribute namespace configurable to support multiple dialects.
     private static final String ATTRIBUTE_NAMESPACE = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims";
 
     private static final Logger logger = Logger.getLogger(WsFedSAML11AssertionTypeBuilder.class);
+
+    private final class SAML11AttributeArrayMapper {
+        SAML11AttributeStatementType attributeStatement;
+        SAML11AttributeArrayMapper(SAML11AttributeStatementType attributeStatement) {
+            this.attributeStatement = attributeStatement;
+        }
+        void mapAttributes(AttributeStatementType saml2AttributeStatement,
+                       Function<AttributeType, SAML11AttributeType> mapper) {
+
+            if (mapper == null)
+                throw new NullPointerException("Mapper cannot be null");
+
+            for (AttributeStatementType.ASTChoiceType astChoice : saml2AttributeStatement.getAttributes()) {
+                AttributeType attribute = astChoice.getAttribute();
+                EncryptedElementType encryptedElement = astChoice.getEncryptedAssertion();
+
+                if (attribute != null) {
+                    SAML11AttributeType samlAttribute = mapper.apply(attribute);
+                    attributeStatement.add(samlAttribute);
+                }
+
+                if (encryptedElement != null) {
+                    logger.warn("Encrypted assertion attributes are not supported.");
+                }
+            }
+        }
+    }
 
     public SAML11AssertionType build() throws ConfigurationException, ProcessingException, DatatypeConfigurationException {
         String responseIssuer = getResponseIssuer(realm);
@@ -99,41 +127,37 @@ public class WsFedSAML11AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstr
         return assertion;
     }
 
-    protected void populateRoles(SamlProtocol.ProtocolMapperProcessor<WSFedSAMLRoleListMapper> roleListMapper,
-                                 SAML11AssertionType assertion,
-                                 KeycloakSession session,
-                                 UserSessionModel userSession, ClientSessionModel clientSession) {
+    private void populateRoles(SamlProtocol.ProtocolMapperProcessor<WSFedSAMLRoleListMapper> roleListMapper,
+                               SAML11AssertionType assertion,
+                               KeycloakSession session,
+                               UserSessionModel userSession, ClientSessionModel clientSession) {
         if (roleListMapper == null) return;
 
         AttributeStatementType tempAttributeStatement = new AttributeStatementType();
+
+        // TODO should there be different mappers to support SAML1.0 and SAML2.0 formats?
+        // For instance, SAML1.0 may need "AttributeNamespace" explicitly specified,
+        // wherease SAML2.0 needs a format specifier which does not map to anything in SAML1.0. Or does it?
         roleListMapper.mapper.mapRoles(tempAttributeStatement, roleListMapper.model, session, userSession, clientSession);
 
         SAML11AttributeStatementType attributeStatement = getAttributeStatement(assertion);
-        copyAttributesFromSAML20AttributeStatement(tempAttributeStatement, attributeStatement);
+
+        SAML11AttributeArrayMapper samlAttributeMapper = new SAML11AttributeArrayMapper(attributeStatement);
+        samlAttributeMapper.mapAttributes(tempAttributeStatement, attribute -> {
+            // TODO what is there to do with SAML2 attribute name format?
+
+            // Change the role attribute name to lowercase, i.e. "Role" becomes "role"
+            SAML11AttributeType samlAttribute = new SAML11AttributeType(attribute.getName().toLowerCase(), URI.create(ATTRIBUTE_NAMESPACE));
+            if (!attribute.getAttributeValue().isEmpty()) {
+                samlAttribute.add(attribute.getAttributeValue().get(0).toString());
+            } else {
+                logger.warnf("The attribute '%s' does not have a value", attribute.getName());
+            }
+            return samlAttribute;
+        });
 
         if(!attributeStatement.get().isEmpty() && assertion.getStatements().isEmpty()) {
             assertion.add(attributeStatement);
-        }
-    }
-
-    private void copyAttributesFromSAML20AttributeStatement(AttributeStatementType tempAttributeStatement, SAML11AttributeStatementType attributeStatement) {
-        for (AttributeStatementType.ASTChoiceType astChoice : tempAttributeStatement.getAttributes()) {
-            AttributeType attribute = astChoice.getAttribute();
-            EncryptedElementType encryptedElement = astChoice.getEncryptedAssertion();
-
-            if (attribute != null) {
-                SAML11AttributeType samlAttribute = new SAML11AttributeType(attribute.getName(), URI.create(ATTRIBUTE_NAMESPACE));
-                if (!attribute.getAttributeValue().isEmpty()) {
-                    samlAttribute.add(attribute.getAttributeValue().get(0).toString());
-                } else {
-                    logger.warnf("The attribute '%s' does not have a value", attribute.getName());
-                }
-                attributeStatement.add(samlAttribute);
-            }
-
-            if (encryptedElement != null) {
-                logger.warn("Encrypted assertion attributes are not supported.");
-            }
         }
     }
 
@@ -154,7 +178,7 @@ public class WsFedSAML11AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstr
         return attributeStatement;
     }
 
-    public void transformAttributeStatement(List<SamlProtocol.ProtocolMapperProcessor<WSFedSAMLAttributeStatementMapper>> attributeStatementMappers,
+    private void transformAttributeStatement(List<SamlProtocol.ProtocolMapperProcessor<WSFedSAMLAttributeStatementMapper>> attributeStatementMappers,
                                             SAML11AssertionType assertion,
                                             KeycloakSession session,
                                             UserSessionModel userSession, ClientSessionModel clientSession) {
@@ -164,7 +188,18 @@ public class WsFedSAML11AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstr
         }
 
         SAML11AttributeStatementType attributeStatement = getAttributeStatement(assertion);
-        copyAttributesFromSAML20AttributeStatement(tempAttributeStatement, attributeStatement);
+
+        SAML11AttributeArrayMapper samlAttributeMapper = new SAML11AttributeArrayMapper(attributeStatement);
+        samlAttributeMapper.mapAttributes(tempAttributeStatement, attribute -> {
+            // TODO what is there to do with SAML2 attribute name format?
+            SAML11AttributeType samlAttribute = new SAML11AttributeType(attribute.getName(), URI.create(ATTRIBUTE_NAMESPACE));
+            if (!attribute.getAttributeValue().isEmpty()) {
+                samlAttribute.add(attribute.getAttributeValue().get(0).toString());
+            } else {
+                logger.warnf("The attribute '%s' does not have a value", attribute.getName());
+            }
+            return samlAttribute;
+        });
 
         if(!attributeStatement.get().isEmpty() && assertion.getStatements().isEmpty()) {
             assertion.add(attributeStatement);
