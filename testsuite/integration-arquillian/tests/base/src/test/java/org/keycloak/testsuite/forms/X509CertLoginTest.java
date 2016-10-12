@@ -340,7 +340,6 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
                     .oCSPEnabled(false)
                     .regularExpression("emailAddress=(.*?)(?:,|$)")
                     .setSubjectDNAsUserIdentitySource()
-                    .setTrustStorePassword("changeit")
                     .setUsernameOrEmailUserIdentityMapper();
         }
 
@@ -398,18 +397,6 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         }
         public X509AuthenticatorConfigBuilder setExtendedKeyUsage(String extendedKeyUsage) {
             parameters.put(CERTIFICATE_EXTENDED_KEY_USAGE, extendedKeyUsage);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setTrustStorePath(String trustStorePath) {
-            parameters.put(TRUSTSTORE_PATH, trustStorePath);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setTrustStorePassword(String password) {
-            parameters.put(TRUSTSTORE_PASSWORD, password);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setTrustStoreType(String type) {
-            parameters.put(TRUSTSTORE_TYPE, type);
             return this;
         }
 

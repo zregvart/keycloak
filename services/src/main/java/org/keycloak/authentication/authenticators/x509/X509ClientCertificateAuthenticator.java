@@ -83,7 +83,6 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 certificateValidationParameters(parameters)
                         .build(certs)
                             .validDates()
-                            .validateCertificatePath()
                             .checkRevocationStatus()
                             .validateKeyUsage()
                             .validateExtendedKeyUsage();
