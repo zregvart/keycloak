@@ -20,6 +20,8 @@ package org.keycloak.authentication.authenticators.x509;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationProcessor;
+import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
+import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.*;
@@ -43,7 +45,6 @@ import java.util.Map;
 public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertificateAuthenticator {
 
     protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
-
 
     @Override
     public void close() {
@@ -80,12 +81,12 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
 
             // Validate X509 client certificate
             try {
-                certificateValidationParameters(parameters)
-                        .build(certs)
-                            .validDates()
-                            .checkRevocationStatus()
-                            .validateKeyUsage()
-                            .validateExtendedKeyUsage();
+                CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(parameters);
+                CertificateValidator validator = builder.build(certs);
+                validator.validDates()
+                         .checkRevocationStatus()
+                         .validateKeyUsage()
+                         .validateExtendedKeyUsage();
             }
             catch(GeneralSecurityException e) {
                 logger.errorf("[X509ClientCertificateAuthenticator:authenticate] Exception: %s", e.getMessage());
@@ -100,7 +101,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             catch(Exception e) {
                 logger.errorf("[X509ClientCertificateAuthenticator:authenticate] Exception: %s", e.getMessage());
                 // TODO use specific locale to load error messages
-                String errorMessage = "Certificate validation failed.";
+                String errorMessage = "Certificate validation's failed.";
                 // TODO is calling form().setErrors enough to show errors on login screen?
                 context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),
                         errorMessage, e.getMessage()));
@@ -108,20 +109,22 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 return;
             }
 
-            Object userIdentity = UserIdentityExtractorBuilder.fromConfig(parameters).extractUserIdentity(certs);
+            Object userIdentity = getUserIdentityExtractor(parameters).extractUserIdentity(certs);
             if (userIdentity == null) {
                 logger.warnf("[X509ClientCertificateAuthenticator:authenticate] Unable to extract user identity from certificate.");
                 // TODO use specific locale to load error messages
                 String errorMessage = "Unable to extract user identity from specified certificate";
                 // TODO is calling form().setErrors enough to show errors on login screen?
                 context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(), errorMessage));
+                context.attempted();
                 return;
             }
 
             UserModel user;
             try {
-                user = UserIdentityToModelMapperBuilder.fromConfig(parameters)
-                        .find(context, userIdentity);
+                context.getEvent().detail(Details.USERNAME, userIdentity.toString());
+                context.getClientSession().setNote(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME, userIdentity.toString());
+                user = getUserIdentityToModelMapper(parameters).find(context, userIdentity);
             }
             catch(ModelDuplicateException e) {
                 logger.modelDuplicateException(e);
@@ -145,8 +148,6 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             }
 
             if (!userEnabled(context, user)) {
-                context.getEvent().user(user);
-                context.getEvent().error(Errors.USER_DISABLED);
                 // TODO use specific locale to load error messages
                 String errorMessage = "X509 certificate authentication's failed.";
                 // TODO is calling form().setErrors enough to show errors on login screen?

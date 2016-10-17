@@ -110,6 +110,10 @@ public class CertificateValidator {
     String _cRLRelativePath;
     boolean _ocspEnabled;
     String _responderUri;
+
+    public CertificateValidator() {
+
+    }
     protected CertificateValidator(X509Certificate[] certChain,
                          int keyUsageBits, List<String> extendedKeyUsage,
                                    boolean cRLCheckingEnabled,
@@ -127,7 +131,7 @@ public class CertificateValidator {
         _responderUri = oCSPResponderURI;
     }
 
-    CertificateValidator validDates() throws GeneralSecurityException {
+    public CertificateValidator validDates() throws GeneralSecurityException {
         Date dt = new Date();
         _certChain[0].checkValidity(dt);
         return this;
@@ -200,16 +204,22 @@ public class CertificateValidator {
         }
     }
 
-    CertificateValidator validateKeyUsage() throws GeneralSecurityException {
+    public CertificateValidator validateKeyUsage() throws GeneralSecurityException {
         validateKeyUsage(_certChain, _keyUsageBits);
         return this;
     }
-    CertificateValidator validateExtendedKeyUsage() throws GeneralSecurityException {
+    public CertificateValidator validateExtendedKeyUsage() throws GeneralSecurityException {
         validateExtendedKeyUsage(_certChain, _extendedKeyUsage);
         return this;
     }
     private static void checkRevocationUsingOCSP(X509Certificate[] certs, String responderUri) throws GeneralSecurityException {
 
+        if (certs.length < 2) {
+            // OCSP requires a responder certificate to verify OCSP
+            // signed response.
+            String message = "OCSP requires a responder certificate. OCSP cannot be used to verify the revocation status of self-signed certificates.";
+            throw new GeneralSecurityException(message);
+        }
         try {
             OCSP.RevocationStatus rs;
 
@@ -407,9 +417,7 @@ public class CertificateValidator {
                     }
                 }
             }
-        } catch (IOException e) {
-            logger.error(e.getMessage());
-        } catch(ClassCastException e) {
+        } catch (IOException | ClassCastException e) {
             logger.error(e.getMessage());
         }
 
@@ -428,15 +436,16 @@ public class CertificateValidator {
         }
     }
 
-    CertificateValidator checkRevocationStatus() throws GeneralSecurityException {
-        if (!(_crlCheckingEnabled || _crldpEnabled || _ocspEnabled)) {
+    public CertificateValidator checkRevocationStatus() throws GeneralSecurityException {
+        if (!(_crlCheckingEnabled || _ocspEnabled)) {
             return this;
         }
-        if (_crlCheckingEnabled || _crldpEnabled) {
-            if (_crlCheckingEnabled && !_crldpEnabled) {
+        if (_crlCheckingEnabled) {
+            if (!_crldpEnabled) {
                 checkRevocationStatusUsingCRL(_certChain, _cRLRelativePath /*"crl.pem"*/);
+            } else {
+                checkRevocationStatusUsingCRLDistributionPoints(_certChain);
             }
-            checkRevocationStatusUsingCRLDistributionPoints(_certChain);
         }
         if (_ocspEnabled) {
             checkRevocationUsingOCSP(_certChain, _responderUri);
@@ -447,7 +456,7 @@ public class CertificateValidator {
     /**
      * Configure Certificate validation
      */
-    static class CertificateValidatorBuilder {
+    public static class CertificateValidatorBuilder {
         // A hand written DSL that walks through successive steps to configure
         // instances of CertificateValidator type. The design is an adaption of
         // the approach described in http://programmers.stackexchange.com/questions/252067/learning-to-write-dsls-utilities-for-unit-tests-and-am-worried-about-extensablit
@@ -460,7 +469,7 @@ public class CertificateValidator {
         boolean _ocspEnabled;
         String _responderUri;
 
-        CertificateValidatorBuilder() {
+        public CertificateValidatorBuilder() {
             _extendedKeyUsage = new LinkedList<>();
             _keyUsageBits = 0;
         }
@@ -617,7 +626,7 @@ public class CertificateValidator {
             return new RevocationStatusCheckBuilder(this);
         }
 
-        CertificateValidator build(X509Certificate[] certs) {
+        public CertificateValidator build(X509Certificate[] certs) {
             return new CertificateValidator(certs, _keyUsageBits, _extendedKeyUsage,
                     _crlCheckingEnabled, _crldpEnabled, _cRLRelativePath, _ocspEnabled, _responderUri);
         }
