@@ -71,12 +71,12 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         }
         // Validate X509 client certificate
         try {
-            certificateValidationParameters(parameters)
-                    .build(certs)
-                        .validDates()
-                        .checkRevocationStatus()
-                        .validateKeyUsage()
-                        .validateExtendedKeyUsage();
+            CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(parameters);
+            CertificateValidator validator = builder.build(certs);
+            validator.validDates()
+                    .checkRevocationStatus()
+                    .validateKeyUsage()
+                    .validateExtendedKeyUsage();
         }
         catch(GeneralSecurityException e) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Exception: %s", e.getMessage());
@@ -95,7 +95,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             return;
         }
 
-        Object userIdentity = UserIdentityExtractorBuilder.fromConfig(parameters).extractUserIdentity(certs);
+        Object userIdentity = getUserIdentityExtractor(parameters).extractUserIdentity(certs);
         if (userIdentity == null) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Unable to extract user identity from certificate.");
             // TODO use specific locale to load error messages
@@ -108,8 +108,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         try {
             context.getEvent().detail(Details.USERNAME, userIdentity.toString());
             context.getClientSession().setNote(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME, userIdentity.toString());
-            user = UserIdentityToModelMapperBuilder.fromConfig(parameters)
-                    .find(context, userIdentity);
+            user = getUserIdentityToModelMapper(parameters).find(context, userIdentity);
         }
         catch(ModelDuplicateException e) {
             logger.modelDuplicateException(e);

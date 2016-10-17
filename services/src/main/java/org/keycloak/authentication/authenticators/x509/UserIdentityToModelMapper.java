@@ -35,12 +35,12 @@ import java.util.List;
 
 public abstract class UserIdentityToModelMapper {
 
-    abstract UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception;
+    public abstract UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception;
 
     static class UsernameOrEmailMapper extends UserIdentityToModelMapper {
 
         @Override
-        UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception {
+        public UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception {
             return KeycloakModelUtils.findUserByNameOrEmail(context.getSession(), context.getRealm(), userIdentity.toString().trim());
         }
     }
@@ -53,7 +53,7 @@ public abstract class UserIdentityToModelMapper {
         }
 
         @Override
-        UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception {
+        public UserModel find(AuthenticationFlowContext context, Object userIdentity) throws Exception {
             KeycloakSession session = context.getSession();
             List<UserModel> users = session.users().searchForUserByUserAttribute(_customAttribute, userIdentity.toString(), context.getRealm());
             if (users != null && users.size() > 1) {
