@@ -143,7 +143,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         //parameters = new HashMap<>();
 
         doReturn(configurationIsMissingResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
 
         authenticator.authenticate(flowContext);
 
@@ -159,7 +159,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
 
         doThrow(GeneralSecurityException.class).when(mockValidator).validDates();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -177,7 +177,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validDates();
         doThrow(GeneralSecurityException.class).when(mockValidator).checkRevocationStatus();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -196,7 +196,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doThrow(GeneralSecurityException.class).when(mockValidator).validateKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -215,7 +215,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doThrow(GeneralSecurityException.class).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -232,7 +232,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
 
         doThrow(Exception.class).when(mockValidator).validDates();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -252,7 +252,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(nullUserIdentityResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -281,7 +281,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidUserResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -306,7 +306,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(invalidUserCredentialsResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -330,7 +330,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(accountDisabledResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -357,7 +357,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(accountTemporarilyDisabledResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
@@ -386,7 +386,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(accountTemporarilyDisabledResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
 
