@@ -161,6 +161,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.mock-server</groupId>
+            <artifactId>mockserver-netty</artifactId>
+            <version>RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.icegreen</groupId>
             <artifactId>greenmail</artifactId>
             <scope>test</scope>
@@ -185,6 +191,32 @@
                     </compilerArgument>
                 </configuration>
             </plugin>
+            <!--<plugin>-->
+                <!--<groupId>org.mock-server</groupId>-->
+                <!--<artifactId>mockserver-maven-plugin</artifactId>-->
+                <!--<version>3.10.4</version>-->
+                <!--<configuration>-->
+                    <!--<serverPort>1080</serverPort>-->
+                    <!--<proxyPort>1090</proxyPort>-->
+                    <!--<logLevel>WARN</logLevel>-->
+                <!--</configuration>-->
+                <!--<executions>-->
+                    <!--<execution>-->
+                        <!--<id>process-test-classes</id>-->
+                        <!--<phase>process-test-classes</phase>-->
+                        <!--<goals>-->
+                            <!--<goal>start</goal>-->
+                        <!--</goals>-->
+                    <!--</execution>-->
+                    <!--<execution>-->
+                        <!--<id>verify</id>-->
+                        <!--<phase>verify</phase>-->
+                        <!--<goals>-->
+                            <!--<goal>stop</goal>-->
+                        <!--</goals>-->
+                    <!--</execution>-->
+                <!--</executions>-->
+            <!--</plugin>-->
         </plugins>
     </build>
 

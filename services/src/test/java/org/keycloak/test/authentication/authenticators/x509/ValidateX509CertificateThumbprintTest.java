@@ -108,7 +108,7 @@ public class ValidateX509CertificateThumbprintTest extends AbstractX509Test {
     public void testInvalidUserCredentialsResponseWhenMissingCredentials() throws NoSuchAlgorithmException, CertificateEncodingException {
 
         doReturn(unauthorizedResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
-        doReturn(certificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
+        doReturn(clientCertificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
         doReturn(asList()).when(user).getCredentialsDirectly();
 
         authenticator.authenticate(flowContext);
@@ -121,7 +121,7 @@ public class ValidateX509CertificateThumbprintTest extends AbstractX509Test {
     public void testInvalidUserCredentialsResponseWhenCredentialsMismatch() throws NoSuchAlgorithmException, CertificateEncodingException {
 
         doReturn(invalidCredentialsResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
-        doReturn(certificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
+        doReturn(clientCertificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
         doReturn(asList(credentials)).when(user).getCredentialsDirectly();
         doReturn("somebadsignature").when(credentials).getValue();
         doReturn(ValidateX509CertificateThumbprint.CREDENTIAL_TYPE).when(credentials).getType();
@@ -136,11 +136,11 @@ public class ValidateX509CertificateThumbprintTest extends AbstractX509Test {
     public void testCertificateThumbprintMatchSuccess() throws NoSuchAlgorithmException, CertificateEncodingException {
 
         doReturn(invalidCredentialsResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
-        doReturn(certificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
+        doReturn(clientCertificates).when(context).getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
 
         doReturn(asList(credentials)).when(user).getCredentialsDirectly();
         doReturn(ValidateX509CertificateThumbprint.CREDENTIAL_TYPE).when(credentials).getType();
-        doReturn(CertificateThumbprint.computeDigest(certificates)).when(credentials).getValue();
+        doReturn(CertificateThumbprint.computeDigest(clientCertificates)).when(credentials).getValue();
 
         authenticator.authenticate(flowContext);
 

@@ -143,7 +143,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     @Test
     public void testErrorResponseOnMissingConfiguration() {
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
 
         authenticator.authenticate(flowContext);
 
@@ -157,7 +157,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
 
         action.accept(mockValidator);
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
 
         authenticator.authenticate(flowContext);
@@ -224,7 +224,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(null).when(userIdExtractor).extractUserIdentity(any());
 
@@ -247,7 +247,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn("username").when(userIdExtractor).extractUserIdentity(any());
         doReturn(null).when(userIdModelMapper).find(any(),any());
@@ -274,7 +274,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn("username").when(userIdExtractor).extractUserIdentity(any());
         doThrow(ModelDuplicateException.class).when(userIdModelMapper).find(any(),any());
@@ -300,7 +300,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn("username").when(userIdExtractor).extractUserIdentity(any());
         doReturn(user).when(userIdModelMapper).find(any(),any());
@@ -328,7 +328,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn("username").when(userIdExtractor).extractUserIdentity(any());
         doReturn(user).when(userIdModelMapper).find(any(),any());
@@ -361,7 +361,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
 
-        doReturn(certificates).when(context).getAttribute(any());
+        doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
         doReturn(userName).when(userIdExtractor).extractUserIdentity(any());
         doReturn(user).when(userIdModelMapper).find(any(),any());
@@ -381,7 +381,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
 
         verify(loginFormsProvider,times(3)).setAttribute(nameCaptor.capture(), valueCaptor.capture());
         Assert.assertEquals("some_user_name", valueCaptor.getAllValues().get(0));
-        Assert.assertEquals("CN=IDP", valueCaptor.getAllValues().get(1));
+        Assert.assertEquals("CN=Client", valueCaptor.getAllValues().get(1));
         Assert.assertEquals(true, valueCaptor.getAllValues().get(2));
 
         verify(flowContext,atLeastOnce()).forceChallenge(any());
