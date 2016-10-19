@@ -91,7 +91,7 @@ public abstract class AbstractOAuth2IdentityProvider<C extends OAuth2IdentityPro
         try {
             URI authorizationUrl = createAuthorizationUrl(request).build();
 
-            return Response.temporaryRedirect(authorizationUrl).build();
+            return Response.seeOther(authorizationUrl).build();
         } catch (Exception e) {
             throw new IdentityBrokerException("Could not create authentication request.", e);
         }
@@ -233,9 +233,9 @@ public abstract class AbstractOAuth2IdentityProvider<C extends OAuth2IdentityPro
                         federatedIdentity.setToken(response);
                     }
 
-                    federatedIdentity.setCode(state);
                     federatedIdentity.setIdpConfig(getConfig());
                     federatedIdentity.setIdp(AbstractOAuth2IdentityProvider.this);
+                    federatedIdentity.setCode(state);
 
                     return callback.authenticated(federatedIdentity);
                 }

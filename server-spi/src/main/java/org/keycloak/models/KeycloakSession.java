@@ -17,6 +17,7 @@
 
 package org.keycloak.models;
 
+import org.keycloak.component.ComponentModel;
 import org.keycloak.models.cache.UserCache;
 import org.keycloak.provider.Provider;
 import org.keycloak.scripting.ScriptingProvider;
@@ -59,6 +60,8 @@ public interface KeycloakSession {
      */
     <T extends Provider> T getProvider(Class<T> clazz, String id);
 
+    <T extends Provider> T getProvider(Class<T> clazz, ComponentModel componentModel);
+
     /**
      * Get all provider factories that manage provider instances of class.
      *
@@ -69,6 +72,8 @@ public interface KeycloakSession {
     <T extends Provider> Set<String> listProviderIds(Class<T> clazz);
 
     <T extends Provider> Set<T> getAllProviders(Class<T> clazz);
+
+    Class<? extends Provider> getProviderClass(String providerClassName);
 
     Object getAttribute(String attribute);
     Object removeAttribute(String attribute);
@@ -109,7 +114,7 @@ public interface KeycloakSession {
     UserCache getUserCache();
 
     /**
-     * A possibly cached view of all users in system.
+     * A cached view of all users in system including deprecated UserFederationProvider SPI
      *
      * @return
      */
@@ -126,12 +131,12 @@ public interface KeycloakSession {
     UserCredentialManager userCredentialManager();
 
     /**
-     *  A possibly cached view of all users in system that does NOT include users available from the deprecated UserFederationProvider SPI.
+     *  A cached view of all users in system that does NOT include users available from the deprecated UserFederationProvider SPI.
      */
     UserProvider userStorage();
 
     /**
-     * Keycloak specific local storage for users.  No cache in front, this api talks directly to database.
+     * Keycloak specific local storage for users.  No cache in front, this api talks directly to database configured for Keycloak
      *
      * @return
      */
@@ -145,6 +150,12 @@ public interface KeycloakSession {
      */
     UserFederatedStorageProvider userFederatedStorage();
 
+    /**
+     * Key manager
+     *
+      * @return
+     */
+    KeyManager keys();
 
     /**
      * Keycloak scripting support.

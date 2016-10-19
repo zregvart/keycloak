@@ -82,7 +82,7 @@ public class TwitterIdentityProvider extends AbstractIdentityProvider<OAuth2Iden
 
             URI authenticationUrl = URI.create(requestToken.getAuthenticationURL());
 
-            return Response.temporaryRedirect(authenticationUrl).build();
+            return Response.seeOther(authenticationUrl).build();
         } catch (Exception e) {
             throw new IdentityBrokerException("Could send authentication request to twitter.", e);
         }
@@ -148,8 +148,8 @@ public class TwitterIdentityProvider extends AbstractIdentityProvider<OAuth2Iden
                 tokenBuilder.append("}");
 
                 identity.setToken(tokenBuilder.toString());
-                identity.setCode(state);
                 identity.setIdpConfig(getConfig());
+                identity.setCode(state);
 
                 return callback.authenticated(identity);
             } catch (Exception e) {
