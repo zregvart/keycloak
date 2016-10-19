@@ -53,7 +53,6 @@ import static org.mockito.Mockito.mock;
  * @date 10/16/2016
  */
 
-//@Ignore
 public class CertificateValidatorTest extends AbstractX509Test {
 
     private X509CRL _crl;
