@@ -16,6 +16,8 @@
 
 package org.keycloak.broker.wsfed;
 
+import org.keycloak.protocol.wsfed.WSFedLoginProtocol;
+import org.keycloak.protocol.wsfed.builders.WSFedProtocolParameters;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.wsfed.common.builders.WSFedResponseBuilder;
 import org.keycloak.wsfed.common.utils.WSFedValidator;
@@ -130,7 +132,7 @@ public class WSFedEndpoint {
         if (wsfedResult != null) return handleWsFedResponse(wsfedResult, context);
         if (wsfedAction.compareTo(WSFedConstants.WSFED_SIGNOUT_ACTION) == 0) return handleSignoutRequest(context);
         if (wsfedAction.compareTo(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION) == 0)
-            return handleSignoutResponse(context);
+            return handleSignoutCleanupResponse(context);
 
         return ErrorPage.error(session, Messages.INVALID_REQUEST);
     }
@@ -168,6 +170,46 @@ public class WSFedEndpoint {
 
         return builder.buildResponse(null);
     }
+
+    public Response handleSignoutCleanupResponse(String context) {
+        AuthenticationManager.AuthResult result = authenticateIdentityCookie(session, realm);
+
+        if (result == null || result.getSession() == null) {
+            logger.error("no valid user session");
+            event.event(EventType.LOGOUT);
+            event.error(Errors.USER_SESSION_NOT_FOUND);
+            return ErrorPage.error(session, Messages.IDENTITY_PROVIDER_UNEXPECTED_ERROR);
+        }
+
+        UserSessionModel userSession = result.getSession();
+
+        if (userSession.getState() != UserSessionModel.State.LOGGED_IN) {
+            logger.error("No active user session");
+            event.event(EventType.LOGOUT);
+            event.error(Errors.USER_SESSION_NOT_FOUND);
+            // According to 2.2.6 wsignoutcleanup 1.0 Request message description,
+            // the protocol does not specify a response back to the requestor IP/STS
+            // initiating the wsignoutclean1.0 message.
+            //return ErrorPage.error(session, Messages.SESSION_NOT_ACTIVE);
+        }
+        MultivaluedMap<String,String> requestParams = uriInfo.getQueryParameters(true);
+        WSFedProtocolParameters params = WSFedProtocolParameters.fromParameters(requestParams);
+
+        // Check if the IP/STS specified a wreply query parameter
+        String redirectUrl = params.getWsfed_reply();
+        if (redirectUrl == null || redirectUrl.isEmpty()) {
+            // TODO: IP/STS has not specified a 'wreply' query parameter, can we just use the single logout url?
+            // TODO: is abscence of wreply implies that IP/STS is using a backchannel and does not expect a response from RP?
+            // TODO: should 'wreply' and single logout Url match?
+            redirectUrl = config.getSingleLogoutServiceUrl();
+        }
+
+        userSession.setNote(WSFedLoginProtocol.WSFED_LOGOUT_BINDING_URI, redirectUrl);
+        userSession.setNote(AuthenticationManager.KEYCLOAK_LOGOUT_PROTOCOL, WSFedLoginProtocol.LOGIN_PROTOCOL);
+
+        return AuthenticationManager.finishBrowserLogout(session, realm, userSession, uriInfo, clientConnection, headers);
+    }
+
 
     public Response handleSignoutResponse(String context) {
         AuthenticationManager.AuthResult result = authenticateIdentityCookie(session, realm);
