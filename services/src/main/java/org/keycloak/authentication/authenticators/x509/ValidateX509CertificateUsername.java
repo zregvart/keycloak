@@ -73,8 +73,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         try {
             CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(parameters);
             CertificateValidator validator = builder.build(certs);
-            validator.validDates()
-                    .checkRevocationStatus()
+            validator.checkRevocationStatus()
                     .validateKeyUsage()
                     .validateExtendedKeyUsage();
         }
