@@ -81,8 +81,9 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
         }
     }
 
-    CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(Map<String,String> parameters) throws Exception {
-        return X509ClientCertificateAuthenticator.CertificateValidatorConfigBuilder.fromConfig(parameters);
+    // The method is purely for purposes of facilitating the unit testing
+    public CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(Map<String,String> parameters) throws Exception {
+        return CertificateValidatorConfigBuilder.fromConfig(parameters);
     }
 
     protected static class UserIdentityExtractorBuilder {
@@ -151,7 +152,14 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
         return certs;
     }
-
+    // Purely for unit testing
+    public UserIdentityExtractor getUserIdentityExtractor(Map<String, String> parameters) {
+        return UserIdentityExtractorBuilder.fromConfig(parameters);
+    }
+    // Purely for unit testing
+    public UserIdentityToModelMapper getUserIdentityToModelMapper(Map<String,String> parameters) {
+        return UserIdentityToModelMapperBuilder.fromConfig(parameters);
+    }
     @Override
     public boolean requiresUser() {
         return false;

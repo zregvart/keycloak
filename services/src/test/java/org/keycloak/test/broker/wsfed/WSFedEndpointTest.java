@@ -177,12 +177,12 @@ public class WSFedEndpointTest {
     @Test
     public void testExecuteHandleSignoutResponse() {
         when(config.handleEmptyActionAsLogout()).thenReturn(false);
-        doReturn(mock(Response.class)).when(endpoint).handleSignoutResponse("context");
+        doReturn(mock(Response.class)).when(endpoint).handleSignoutCleanupResponse("context");
 
         Response response = endpoint.execute(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION, null, "context");
         assertNotNull(response);
 
-        verify(endpoint, times(1)).handleSignoutResponse("context");
+        verify(endpoint, times(1)).handleSignoutCleanupResponse("context");
     }
 
     @Test
