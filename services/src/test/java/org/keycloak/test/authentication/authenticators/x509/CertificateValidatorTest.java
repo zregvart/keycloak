@@ -37,7 +37,6 @@ import javax.naming.spi.InitialContextFactory;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
@@ -139,6 +138,13 @@ public class CertificateValidatorTest extends AbstractX509Test {
     }
 
     @Test(expected = GeneralSecurityException.class)
+    public void testExceptionOnMissingNoKeyUsageExtension() throws GeneralSecurityException {
+        CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                .keyUsage().enableDataEncriphermentBit().back().build(clientCertificatesNoKeyUsage);
+        validator.validateKeyUsage();
+    }
+
+    @Test(expected = GeneralSecurityException.class)
     public void testExceptionOnKeyUsageDataEncriphermentBitValidation() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .keyUsage().enableDataEncriphermentBit().back().build(clientCertificates);
@@ -149,6 +155,13 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testExceptionOnKeyUsageDecipherOnlyBitValidation() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .keyUsage().enableDecipherOnlyBit().back().build(clientCertificates);
+        validator.validateKeyUsage();
+    }
+
+    @Test
+    public void testNoExceptionOnNonCriticalKeyUsage() throws GeneralSecurityException {
+        CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                .keyUsage().enableDecipherOnlyBit().back().build(clientCertificatesNonCriticalKeyUsage);
         validator.validateKeyUsage();
     }
 
@@ -231,6 +244,13 @@ public class CertificateValidatorTest extends AbstractX509Test {
     }
 
     @Test
+    public void testNoExceptionOnNonCriticalExtendedKeyUsage() throws GeneralSecurityException {
+        CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                .extendedKeyUsage().parse("1.3.6.1.5.5.7.3.2").build(clientCertificatesNonCriticalKeyUsage);
+        validator.validateExtendedKeyUsage();
+    }
+
+    @Test
     public void testNoExceptionOnNullInput() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .extendedKeyUsage().parse(null).build(clientCertificates);
@@ -241,6 +261,13 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testNoExceptionOnEmptyInput() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .extendedKeyUsage().parse("").build(clientCertificates);
+        validator.validateExtendedKeyUsage();
+    }
+
+    @Test(expected = GeneralSecurityException.class)
+    public void testExceptionOnExtendedKeyUsageMissing() throws GeneralSecurityException {
+        CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                .extendedKeyUsage().parse("1.3.6.1.5.5.7.3.2").build(clientCertificatesNoKeyUsage);
         validator.validateExtendedKeyUsage();
     }
 
