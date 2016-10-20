@@ -21,7 +21,6 @@ package org.keycloak.test.authentication.authenticators.x509;
 import org.bouncycastle.asn1.ocsp.OCSPResponse;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.CRLReason;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -36,9 +35,7 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.operator.jcajce.JcaDigestCalculatorProviderBuilder;
 import org.junit.BeforeClass;
-import org.junit.Test;
-import org.keycloak.authentication.authenticators.x509.CertificateThumbprint;
-import org.keycloak.authentication.authenticators.x509.CertificateValidator;
+import org.keycloak.common.util.CertificateBuilder;
 import org.keycloak.common.util.CertificateUtils;
 
 import java.io.IOException;
@@ -66,6 +63,8 @@ public abstract class AbstractX509Test {
     protected static X509Certificate rootCertificate;
     protected static X509Certificate[] serverCertificates;
     protected static X509Certificate[] clientCertificates;
+    protected static X509Certificate[] clientCertificatesNonCriticalKeyUsage;
+    protected static X509Certificate[] clientCertificatesNoKeyUsage;
     protected static KeyPair idpPair;
     protected static KeyPair clientPair;
     protected static URI cRLdistributionPoint;
@@ -101,8 +100,56 @@ public abstract class AbstractX509Test {
         ocspResponderUri = new URL(mockServerURI.toURL(), "ocsp").toURI();
 
         rootCertificate = generateTestCertificate("IDP", idpPair);
+        clientCertificates = new X509Certificate[] {generateCertificate("Client", clientPair,
+                idpPair.getPrivate(), rootCertificate),  rootCertificate};
 
-        clientCertificates = new X509Certificate[] {generateCertificate("Client", clientPair, idpPair.getPrivate(), rootCertificate),  rootCertificate};
+        clientCertificatesNonCriticalKeyUsage = new X509Certificate[] {generateCertificateNonCriticalKeyUsage("Client", generator.generateKeyPair(),
+                idpPair.getPrivate(), rootCertificate), rootCertificate};
+
+        clientCertificatesNoKeyUsage = new X509Certificate[] {generateCertificateNoKeyUsage("Client", generator.generateKeyPair(),
+                idpPair.getPrivate(), rootCertificate), rootCertificate};
+    }
+
+    private static X509Certificate generateCertificateNoKeyUsage(String subject, KeyPair pair, PrivateKey caPrivateKey, X509Certificate ca) {
+        X509Certificate certificate = null;
+        try {
+            // Creates a V3 X509 certificate with the extensions:
+            // - Subject Key
+            // - Authority Key
+            // - Basic Constraints
+            // KeyUsage and ExtendedKeyUsage extensions are omitted
+            certificate = new CertificateBuilder(pair, caPrivateKey, ca, subject)
+                    .addCRLDistributionPointsExtension(cRLdistributionPoint)
+                    .addOCSPResponderExtension(ocspResponderUri)
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return certificate;
+    }
+
+    private static X509Certificate generateCertificateNonCriticalKeyUsage(String subject, KeyPair pair, PrivateKey caPrivateKey, X509Certificate ca) {
+        X509Certificate certificate = null;
+        try {
+            // Creates a V3 X509 certificate with the extensions:
+            // - Subject Key
+            // - Authority Key
+            // - Key Usage (digitalSignature, keyCertSign, cRLSign)
+            // - Extended Key Usage (id_kp_emailProtection, id_kp_serverAuth)
+            // - Basic Constraints
+            // KeyUsage and ExtendedKeyUsage extensions are NOT critical.
+            // Certificates with invalid key usage or invalid extended key usage
+            // will still pass the certificate validation.
+            certificate = new CertificateBuilder(pair, caPrivateKey, ca, subject)
+                    .addKeyUsageExtension(false)
+                    .addExtendedKeyUsageExtension(false)
+                    .addCRLDistributionPointsExtension(cRLdistributionPoint)
+                    .addOCSPResponderExtension(ocspResponderUri)
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return certificate;
     }
 
     private static X509Certificate generateCertificate(String subject, KeyPair pair, PrivateKey caPrivateKey, X509Certificate ca) {
@@ -114,11 +161,16 @@ public abstract class AbstractX509Test {
             // - Key Usage (digitalSignature, keyCertSign, cRLSign)
             // - Extended Key Usage (id_kp_emailProtection, id_kp_serverAuth)
             // - Basic Constraints
-            // KeyUsage and ExtendedKeyUsage extensions are set to be critical to
+            // KeyUsage and ExtendedKeyUsage extensions are set to be critical
             // so that to force the methods validateKeyUsage and validateExtendedKeyUsage
             // of the CertificateValidator class throw a general security exception when there is a mismatch
             // between the certificate's values and the values specified by the validator.
-            certificate = CertificateUtils.generateV3Certificate(pair, caPrivateKey, ca, subject, cRLdistributionPoint, ocspResponderUri, true, true);
+            certificate = new CertificateBuilder(pair, caPrivateKey, ca, subject)
+                    .addKeyUsageExtension(true)
+                    .addExtendedKeyUsageExtension(true)
+                    .addCRLDistributionPointsExtension(cRLdistributionPoint)
+                    .addOCSPResponderExtension(ocspResponderUri)
+                    .build();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
