@@ -285,12 +285,6 @@ public class CertificateValidator {
         _responderUri = oCSPResponderURI;
     }
 
-    public CertificateValidator validDates() throws GeneralSecurityException {
-        Date dt = new Date();
-        _certChain[0].checkValidity(dt);
-        return this;
-    }
-
     private static void validateKeyUsage(X509Certificate[] certs, int expected) throws GeneralSecurityException {
         boolean[] keyUsageBits = certs[0].getKeyUsage();
         if (keyUsageBits == null) {

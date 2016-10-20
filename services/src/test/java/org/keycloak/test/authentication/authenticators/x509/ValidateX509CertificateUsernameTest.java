@@ -53,7 +53,7 @@ import static org.mockito.Mockito.*;
 /**
  * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
- * @date 10/14/2016
+ * @since 10/14/2016
  */
 
 public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
@@ -151,29 +151,11 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
     }
 
     @Test
-    public void testExceptionOnCertificateWithInvalidDates() throws Exception {
-
-        CertificateValidator mockValidator = spy(new CertificateValidator());
-        doReturn(mockValidator).when(validatorBuilder).build(any());
-
-        doThrow(GeneralSecurityException.class).when(mockValidator).validDates();
-
-        doReturn(clientCertificates).when(context).getAttribute(any());
-        doReturn(new HashMap<String,String>()).when(config).getConfig();
-        doReturn(invalidDatesResponse).when(authenticator).errorResponse(anyInt(), anyString(), anyString());
-
-        authenticator.authenticate(flowContext);
-
-        verify(flowContext).failure(eq(AuthenticationFlowError.INVALID_USER), eq(invalidDatesResponse));
-    }
-
-    @Test
     public void testExceptionRevocationStatusFailed() throws Exception {
 
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doThrow(GeneralSecurityException.class).when(mockValidator).checkRevocationStatus();
 
         doReturn(clientCertificates).when(context).getAttribute(any());
@@ -191,7 +173,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doThrow(GeneralSecurityException.class).when(mockValidator).validateKeyUsage();
 
@@ -209,7 +190,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doThrow(GeneralSecurityException.class).when(mockValidator).validateExtendedKeyUsage();
@@ -229,7 +209,7 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doThrow(Exception.class).when(mockValidator).validDates();
+        doThrow(Exception.class).when(mockValidator).checkRevocationStatus();
 
         doReturn(clientCertificates).when(context).getAttribute(any());
         doReturn(new HashMap<String,String>()).when(config).getConfig();
@@ -246,7 +226,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -275,7 +254,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -300,7 +278,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -324,7 +301,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -351,7 +327,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -380,7 +355,6 @@ public class ValidateX509CertificateUsernameTest extends AbstractX509Test {
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();

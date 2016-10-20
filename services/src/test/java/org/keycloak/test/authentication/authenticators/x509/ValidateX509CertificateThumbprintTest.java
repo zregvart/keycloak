@@ -84,7 +84,6 @@ public class ValidateX509CertificateThumbprintTest extends AbstractX509Test {
         badCredentials.setType(CREDENTIAL_TYPE);
         badCredentials.setValue("badsignature");
 
-
         doReturn(context).when(flowContext).getHttpRequest();
         doReturn(user).when(flowContext).getUser();
         doReturn(events).when(flowContext).getEvent();

@@ -169,17 +169,9 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     }
 
     @Test
-    public void testErrorResponseOnCertificateValidationWithInvalidDates() throws Exception {
-
-        testErrorResponseOnCertificateValidationException(mockValidator -> {
-            doThrow(GeneralSecurityException.class).when(mockValidator).validDates();
-        });
-    }
-    @Test
     public void testErrorResponseOnCertificateValidationBadRevocationStatus() throws Exception {
 
         testErrorResponseOnCertificateValidationException(mockValidator -> {
-            doReturn(mockValidator).when(mockValidator).validDates();
             doThrow(GeneralSecurityException.class).when(mockValidator).checkRevocationStatus();
         });
     }
@@ -188,7 +180,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     public void testErrorResponseOnCertificateValidationBadKeyUsage() throws Exception {
 
         testErrorResponseOnCertificateValidationException(mockValidator -> {
-            doReturn(mockValidator).when(mockValidator).validDates();
             doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
             doThrow(GeneralSecurityException.class).when(mockValidator).validateKeyUsage();
         });
@@ -197,7 +188,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     @Test
     public void testErrorResponseOnCertificateValidationBadExtendedKeyUsage() throws Exception {
         testErrorResponseOnCertificateValidationException(mockValidator -> {
-            doReturn(mockValidator).when(mockValidator).validDates();
             doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
             doReturn(mockValidator).when(mockValidator).validateKeyUsage();
             doThrow(GeneralSecurityException.class).when(mockValidator).validateExtendedKeyUsage();
@@ -207,7 +197,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     @Test
     public void testErrorResponseOnGenericExceptionDuringCertValidation() throws Exception {
         testErrorResponseOnCertificateValidationException(mockValidator -> {
-            doReturn(mockValidator).when(mockValidator).validDates();
             doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
             doThrow(Exception.class).when(mockValidator).validateKeyUsage();
         });
@@ -218,7 +207,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -241,7 +229,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -268,7 +255,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -294,7 +280,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -322,7 +307,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
@@ -355,7 +339,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
         CertificateValidator mockValidator = spy(new CertificateValidator());
         doReturn(mockValidator).when(validatorBuilder).build(any());
 
-        doReturn(mockValidator).when(mockValidator).validDates();
         doReturn(mockValidator).when(mockValidator).checkRevocationStatus();
         doReturn(mockValidator).when(mockValidator).validateKeyUsage();
         doReturn(mockValidator).when(mockValidator).validateExtendedKeyUsage();
