@@ -45,7 +45,7 @@ import java.util.List;
 public class ValidateX509CertificateThumbprint extends AbstractDirectGrantAuthenticator {
 
     public final static String PROVIDER_ID = "direct-grant-auth-x509-thumbprint";
-    private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    private static final ServicesLogger logger = ServicesLogger.LOGGER;
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
     public static final String CREDENTIAL_TYPE = "x509certificate_signature";
 
@@ -105,11 +105,7 @@ public class ValidateX509CertificateThumbprint extends AbstractDirectGrantAuthen
             return;
         }
 
-        String signature = computeDigest(certs);
-
-        UserCredentialModel model = new UserCredentialModel();
-        model.setType(CREDENTIAL_TYPE);
-        model.setValue(signature);
+        UserCredentialModel model = getCredentials(certs);
         boolean valid = context.getSession().userCredentialManager().isValid(context.getRealm(), context.getUser(), model);
         if (!valid) {
             logger.errorf("[ValidateX509CertificateThumbprint:authenticate] The user certificate does not match the provided client certificate.");
@@ -142,17 +138,21 @@ public class ValidateX509CertificateThumbprint extends AbstractDirectGrantAuthen
         return (X509Certificate[]) context.getHttpRequest().getAttribute(JAVAX_SERVLET_REQUEST_X509_CERTIFICATE);
     }
 
-    static String computeDigest(X509Certificate[] certs) {
+    // Made the method public to facilitate the unit testing
+    public UserCredentialModel getCredentials(X509Certificate[] certs) {
 
+        UserCredentialModel model = new UserCredentialModel();
+        model.setType(CREDENTIAL_TYPE);
         try {
-            return CertificateThumbprint.computeDigest(certs);
+            String signature = CertificateThumbprint.computeDigest(certs);
+            model.setValue(signature);
         }
         catch(NoSuchAlgorithmException ex) {
-            logger.errorf("[ValidateX509CertificateThumbprint:computeDigest] %s", ex.toString());
+            logger.errorf("[ValidateX509CertificateThumbprint:getCredentials] %s", ex.toString());
         }
         catch(CertificateEncodingException ex) {
-            logger.errorf("[ValidateX509CertificateThumbprint:computeDigest] %s", ex.toString());
+            logger.errorf("[ValidateX509CertificateThumbprint:getCredentials] %s", ex.toString());
         }
-        return null;
+        return model;
     }
 }

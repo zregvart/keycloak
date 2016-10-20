@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 
 public abstract class UserIdentityExtractor {
 
-    private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    private static final ServicesLogger logger = ServicesLogger.LOGGER;
 
     public abstract Object extractUserIdentity(X509Certificate[] certs);
 

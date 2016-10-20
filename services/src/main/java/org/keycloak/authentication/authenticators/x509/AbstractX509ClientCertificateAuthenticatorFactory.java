@@ -42,7 +42,7 @@ import static org.keycloak.provider.ProviderConfigProperty.STRING_TYPE;
 
 public abstract class AbstractX509ClientCertificateAuthenticatorFactory implements AuthenticatorFactory {
 
-    protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    protected static ServicesLogger logger = ServicesLogger.LOGGER;
 
     private static final String[] mappingSources = {
             MAPPING_SOURCE_CERT_SUBJECTDN,
