@@ -18,12 +18,15 @@
 package org.keycloak.common.util;
 
 import org.bouncycastle.asn1.ASN1Sequence;
-import org.bouncycastle.asn1.DERIA5String;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.*;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509ExtensionUtils;
 import org.bouncycastle.cert.X509v1CertificateBuilder;
@@ -57,97 +60,6 @@ import java.net.URI;
 public class CertificateUtils {
     static {
         BouncyIntegration.init();
-    }
-
-    /**
-     * Generates version 3 {@link java.security.cert.X509Certificate}.
-     *
-     * @param keyPair the key pair
-     * @param caPrivateKey the CA private key
-     * @param caCert the CA certificate
-     * @param subject the subject name
-     *
-     * @return the x509 certificate
-     *
-     * @throws Exception the exception
-     */
-    public static X509Certificate generateV3Certificate(KeyPair keyPair, PrivateKey caPrivateKey, X509Certificate caCert,
-                                                        String subject,
-                                                        URI cRLDistributionPoint,
-                                                        URI ocspResponderUri,
-                                                        boolean isCriticalkeyUsageExt,
-                                                        boolean isCriticalExtendedKeyUsageExt) throws Exception {
-        try {
-            X500Name subjectDN = new X500Name("CN=" + subject);
-
-            // Serial Number
-            SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
-            BigInteger serialNumber = BigInteger.valueOf(Math.abs(random.nextInt()));
-
-            // Validity
-            Date notBefore = new Date(System.currentTimeMillis());
-            Date notAfter = new Date(System.currentTimeMillis() + (((1000L * 60 * 60 * 24 * 30)) * 12) * 3);
-
-            // SubjectPublicKeyInfo
-            SubjectPublicKeyInfo subjPubKeyInfo = new SubjectPublicKeyInfo(ASN1Sequence.getInstance(keyPair.getPublic()
-                    .getEncoded()));
-
-            X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(new X500Name(caCert.getSubjectDN().getName()),
-                    serialNumber, notBefore, notAfter, subjectDN, subjPubKeyInfo);
-
-            DigestCalculator digCalc = new BcDigestCalculatorProvider()
-                    .get(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1));
-            X509ExtensionUtils x509ExtensionUtils = new X509ExtensionUtils(digCalc);
-
-            // Subject Key Identifier
-            certGen.addExtension(Extension.subjectKeyIdentifier, false,
-                    x509ExtensionUtils.createSubjectKeyIdentifier(subjPubKeyInfo));
-
-            // Authority Key Identifier
-            certGen.addExtension(Extension.authorityKeyIdentifier, false,
-                    x509ExtensionUtils.createAuthorityKeyIdentifier(subjPubKeyInfo));
-
-            // Key Usage
-            certGen.addExtension(Extension.keyUsage, isCriticalkeyUsageExt, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyCertSign
-                    | KeyUsage.cRLSign));
-
-            // Extended Key Usage
-            KeyPurposeId[] EKU = new KeyPurposeId[2];
-            EKU[0] = KeyPurposeId.id_kp_emailProtection;
-            EKU[1] = KeyPurposeId.id_kp_serverAuth;
-
-            certGen.addExtension(Extension.extendedKeyUsage, isCriticalExtendedKeyUsageExt, new ExtendedKeyUsage(EKU));
-
-            // Basic Constraints
-            certGen.addExtension(Extension.basicConstraints, true, new BasicConstraints(0));
-
-            // Optional non-critical CRL distribution point extension
-            if (cRLDistributionPoint != null) {
-                DERIA5String derString = new DERIA5String(cRLDistributionPoint.toString());
-                GeneralName gn = new GeneralName(GeneralName.uniformResourceIdentifier, derString);
-                GeneralNames generalNames= new GeneralNames(gn);
-                DistributionPointName dpName = new DistributionPointName(generalNames);
-                DistributionPoint dp = new DistributionPoint(dpName, null, null);
-                DERSequence seq =  new DERSequence(dp);
-                certGen.addExtension(Extension.cRLDistributionPoints, false, seq);
-            }
-
-            if (ocspResponderUri != null) {
-                DERIA5String derString = new DERIA5String(ocspResponderUri.toString());
-                GeneralName gn = new GeneralName(GeneralName.uniformResourceIdentifier, derString);
-                AuthorityInformationAccess aia = new AuthorityInformationAccess(AccessDescription.id_ad_ocsp, gn);
-                byte[] bytes = aia.toASN1Primitive().getEncoded();
-                certGen.addExtension(Extension.authorityInfoAccess, false, aia);
-            }
-
-            // Content Signer
-            ContentSigner sigGen = new JcaContentSignerBuilder("SHA1WithRSAEncryption").setProvider("BC").build(caPrivateKey);
-
-            // Certificate
-            return new JcaX509CertificateConverter().setProvider("BC").getCertificate(certGen.build(sigGen));
-        } catch (Exception e) {
-            throw new RuntimeException("Error creating X509v3Certificate.", e);
-        }
     }
 
     /**
