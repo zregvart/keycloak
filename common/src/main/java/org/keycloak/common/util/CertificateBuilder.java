@@ -28,6 +28,7 @@ import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509ExtensionUtils;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -41,6 +42,7 @@ import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
@@ -59,13 +61,13 @@ public final class CertificateBuilder {
     private final PrivateKey caPrivateKey;
     private final X509v3CertificateBuilder certGen;
     public CertificateBuilder(KeyPair keyPair, PrivateKey caPrivateKey, X509Certificate caCert,
-                              String subject) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException {
+                              String subject) throws NoSuchAlgorithmException, CertIOException, OperatorCreationException, CertificateEncodingException {
         this.caPrivateKey = caPrivateKey;
         this.certGen = createV3CertBuilder(keyPair, caCert, subject);
         addBasicConstraintsExtension(true);
     }
 
-    private X509v3CertificateBuilder createV3CertBuilder(KeyPair keyPair, X509Certificate caCert, String subject) throws NoSuchAlgorithmException, OperatorCreationException, CertIOException {
+    private X509v3CertificateBuilder createV3CertBuilder(KeyPair keyPair, X509Certificate caCert, String subject) throws NoSuchAlgorithmException, OperatorCreationException, CertIOException, CertificateEncodingException {
 
         X500Name subjectDN = new X500Name("CN=" + subject);
 
@@ -81,7 +83,8 @@ public final class CertificateBuilder {
         SubjectPublicKeyInfo subjPubKeyInfo = new SubjectPublicKeyInfo(ASN1Sequence.getInstance(keyPair.getPublic()
                 .getEncoded()));
 
-        X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(new X500Name(caCert.getSubjectDN().getName()),
+        X500Name issuerName = new JcaX509CertificateHolder((X509Certificate) caCert).getSubject();
+        X509v3CertificateBuilder certGen = new X509v3CertificateBuilder(issuerName,
                 serialNumber, notBefore, notAfter, subjectDN, subjPubKeyInfo);
 
 
@@ -146,6 +149,19 @@ public final class CertificateBuilder {
         byte[] bytes = aia.toASN1Primitive().getEncoded();
 
         certGen.addExtension(Extension.authorityInfoAccess, false, aia);
+        return this;
+    }
+
+    public CertificateBuilder addSubjectAltNameExtension(String name) throws CertIOException {
+        GeneralNames subjectAltName = new GeneralNames(new GeneralName[]{
+                new GeneralName(GeneralName.rfc822Name, String.format("%s@example.org", name)),
+                new GeneralName(GeneralName.uniformResourceIdentifier, "http://localhost"),
+                new GeneralName(GeneralName.directoryName, "CN=root.example.com"),
+                new GeneralName(GeneralName.iPAddress, "192.168.1.15"),
+                new GeneralName(GeneralName.dNSName, String.format("server1.%s.com", name))
+        });
+
+        certGen.addExtension(Extension.subjectAlternativeName, false, subjectAltName);
         return this;
     }
 
