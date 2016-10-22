@@ -46,7 +46,11 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
 
     private static final String[] mappingSources = {
             MAPPING_SOURCE_CERT_SUBJECTDN,
+            MAPPING_SOURCE_CERT_SUBJECTDN_EMAIL,
+            MAPPING_SOURCE_CERT_SUBJECTDN_CN,
             MAPPING_SOURCE_CERT_ISSUERDN,
+            MAPPING_SOURCE_CERT_ISSUERDN_EMAIL,
+            MAPPING_SOURCE_CERT_ISSUERDN_CN,
             MAPPING_SOURCE_CERT_SERIALNUMBER
     };
 
@@ -113,7 +117,7 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         cRLRelativePath.setType(STRING_TYPE);
         cRLRelativePath.setName(CRL_RELATIVE_PATH);
         cRLRelativePath.setDefaultValue("crl.pem");
-        cRLRelativePath.setLabel("CRL File path.");
+        cRLRelativePath.setLabel("CRL File path");
         cRLRelativePath.setHelpText("The path to a CRL file that contains a list of revoked certificates. Paths are assumed to be relative to $jboss.server.config.dir");
 
         ProviderConfigProperty oCspCheckingEnabled = new ProviderConfigProperty();
