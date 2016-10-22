@@ -18,6 +18,11 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import freemarker.template.utility.NullArgumentException;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
 import org.keycloak.services.ServicesLogger;
 
 import java.security.cert.X509Certificate;
@@ -36,6 +41,56 @@ public abstract class UserIdentityExtractor {
     private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
 
     public abstract Object extractUserIdentity(X509Certificate[] certs);
+
+    static class OrExtractor extends UserIdentityExtractor {
+
+        UserIdentityExtractor extractor;
+        UserIdentityExtractor other;
+        OrExtractor(UserIdentityExtractor extractor, UserIdentityExtractor other) {
+            this.extractor = extractor;
+            this.other = other;
+
+            if (this.extractor == null)
+                throw new NullArgumentException("extractor");
+            if (this.other == null)
+                throw new NullArgumentException("other");
+        }
+
+        @Override
+        public Object extractUserIdentity(X509Certificate[] certs) {
+            Object result = this.extractor.extractUserIdentity(certs);
+            if (result == null)
+                result = this.other.extractUserIdentity(certs);
+            return result;
+        }
+    }
+
+    static class X500NameRDNExtractor extends UserIdentityExtractor {
+
+        private ASN1ObjectIdentifier x500NameStyle;
+        Function<X509Certificate[],X500Name> x500Name;
+        X500NameRDNExtractor(ASN1ObjectIdentifier x500NameStyle, Function<X509Certificate[],X500Name> x500Name) {
+            this.x500NameStyle = x500NameStyle;
+            this.x500Name = x500Name;
+        }
+
+        @Override
+        public Object extractUserIdentity(X509Certificate[] certs) {
+
+            if (certs == null || certs.length == 0)
+                throw new IllegalArgumentException();
+
+            X500Name name = x500Name.apply(certs);
+            if (name != null) {
+                RDN[] rnds = name.getRDNs(x500NameStyle);
+                if (rnds != null && rnds.length > 0) {
+                    RDN cn = rnds[0];
+                    return IETFUtils.valueToString(cn.getFirst().getValue());
+                }
+            }
+            return null;
+        }
+    }
 
     static class PatternMatcher extends UserIdentityExtractor {
         private final String _pattern;
@@ -67,8 +122,28 @@ public abstract class UserIdentityExtractor {
         }
     }
 
+    static class OrBuilder {
+        UserIdentityExtractor extractor;
+        UserIdentityExtractor other;
+        OrBuilder(UserIdentityExtractor extractor) {
+            this.extractor = extractor;
+        }
+
+        public UserIdentityExtractor or(UserIdentityExtractor other) {
+            return new OrExtractor(extractor, other);
+        }
+    }
+
     public static UserIdentityExtractor getPatternIdentityExtractor(String pattern,
                                                                  Function<X509Certificate[],String> func) {
         return new PatternMatcher(pattern, func);
+    }
+
+    public static UserIdentityExtractor getX500NameExtractor(ASN1ObjectIdentifier identifier, Function<X509Certificate[],X500Name> x500Name) {
+        return new X500NameRDNExtractor(identifier, x500Name);
+    }
+
+    public static OrBuilder either(UserIdentityExtractor extractor) {
+        return new OrBuilder(extractor);
     }
 }

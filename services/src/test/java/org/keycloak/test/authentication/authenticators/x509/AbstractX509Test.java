@@ -77,7 +77,7 @@ public abstract class AbstractX509Test {
         mockServerURI = URI.create(String.format("http://localhost:%d", mockServerPort));
     }
 
-    protected static X509Certificate generateTestCertificate(String subject, KeyPair pair) throws InvalidKeyException,
+    public static X509Certificate generateTestCertificate(String subject, KeyPair pair) throws InvalidKeyException,
             NoSuchProviderException, SignatureException {
 
         X509Certificate certificate = null;
@@ -152,7 +152,7 @@ public abstract class AbstractX509Test {
         return certificate;
     }
 
-    private static X509Certificate generateCertificate(String subject, KeyPair pair, PrivateKey caPrivateKey, X509Certificate ca) {
+    public static X509Certificate generateCertificate(String subject, KeyPair pair, PrivateKey caPrivateKey, X509Certificate ca) {
         X509Certificate certificate = null;
         try {
             // Creates a V3 X509 certificate with the extensions:
