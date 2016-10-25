@@ -39,7 +39,7 @@ import org.keycloak.testsuite.pages.ErrorPage;
 import org.keycloak.testsuite.pages.LoginPage;
 import org.keycloak.testsuite.util.AdminEventPaths;
 import org.keycloak.testsuite.util.AssertAdminEvents;
-import org.keycloak.testsuite.pages.x509.X509LoginPage;
+import org.keycloak.testsuite.pages.x509.X509IdentityConfirmationPage;
 
 import javax.ws.rs.core.Response;
 import java.net.URLDecoder;
@@ -59,6 +59,8 @@ import static org.keycloak.authentication.authenticators.x509.AbstractX509Client
 
 public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
+    public static final String EMPTY_CRL_PATH = "empty.crl";
+    public static final String CLIENT_CRL_PATH = "client.crl";
     protected final Logger log = Logger.getLogger(this.getClass());
 
     static final String REQUIRED = "REQUIRED";
@@ -75,7 +77,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
     protected AppPage appPage;
 
     @Page
-    protected X509LoginPage loginConfirmationPage;
+    protected X509IdentityConfirmationPage loginConfirmationPage;
 
     @Page
     protected LoginPage loginPage;
@@ -219,63 +221,6 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         return ApiUtil.getCreatedId(resp);
     }
 
-//    private DefaultHttpClient getHttpClient() throws Exception {
-//
-//        final HttpParams httpParams = new BasicHttpParams();
-//
-//        // load the keystore containing the client certificate - keystore type is probably jks or pkcs12
-//        String truststorePath = System.getProperty("client.certificate.keystore");
-//        String truststorePassword = System.getProperty("client.certificate.keystore.password");
-//        KeyStore keystore = KeystoreUtil.loadKeyStore(truststorePath, truststorePassword);
-//
-//        // load the trustore, leave it null to rely on cacerts distributed with the JVM - truststore type is probably jks or pkcs12
-//        KeyStore truststore = null;
-////        KeyStore truststore = KeyStore.getInstance("pkcs12");
-////        InputStream truststoreInput = null;
-////        // TODO get the trustore as an InputStream from somewhere
-////        truststore.load(truststoreInput, "secret".toCharArray());
-//
-//        // Configure trust strategy to accept all certificate chains
-//        TrustStrategy trustStrategy = (chain, authType) -> true;
-//
-//        // Configure all accepting host name verifier
-//        X509HostnameVerifier verifier = new X509HostnameVerifier() {
-//
-//            @Override
-//            public boolean verify(String s, SSLSession sslSession) { return true; }
-//
-//            @Override
-//            public void verify(String s, SSLSocket sslSocket) throws IOException {}
-//
-//            @Override
-//            public void verify(String s, X509Certificate x509Certificate) throws SSLException { }
-//
-//            @Override
-//            public void verify(String s, String[] strings, String[] strings1) throws SSLException { }
-//        };
-//
-//
-//        final SchemeRegistry schemeRegistry = new SchemeRegistry();
-//        schemeRegistry.register(new Scheme("https", new SSLSocketFactory(SSLSocketFactory.TLS, keystore, "secret", truststore, new SecureRandom(), trustStrategy, verifier), 443));
-//
-//        return new DefaultHttpClient(new ThreadSafeClientConnManager(httpParams, schemeRegistry), httpParams);
-//    }
-//
-//    private void GetPageUsingDefaultHttpClient() {
-//        DefaultHttpClient client = getHttpClient();
-//        HttpGet get = new HttpGet(OAuthClient.AUTH_SERVER_ROOT + "/admin");
-//        HttpResponse response = client.execute(get);
-//        Assert.assertEquals(200, response.getStatusLine().getStatusCode());
-//    }
-
-    private static String getEmptyCrlPath() {
-        return "empty.crl";
-    }
-
-    private static String getSingleCertificateCrlPath() {
-        return "client.crl";
-    }
-
     private void login(X509AuthenticatorConfigBuilder configBuilder) {
 
         AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", configBuilder.build());
@@ -288,9 +233,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals("test-user@localhost", loginConfirmationPage.getUsernameText());
         Assert.assertTrue(loginConfirmationPage.getLoginDelayCounterText().startsWith("The form will be submitted"));
 
-        loginConfirmationPage.submit();
-        // TODO AppPage currently supports plain HTTP only, so the line below causes the test to fail.
-//        assertTrue(appPage.isCurrent());
+        loginConfirmationPage.confirm();
 
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
@@ -393,7 +336,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals("test-user@localhost", loginConfirmationPage.getUsernameText());
         Assert.assertTrue(loginConfirmationPage.getLoginDelayCounterText().startsWith("The form will be submitted"));
 
-        loginConfirmationPage.submit();
+        loginConfirmationPage.confirm();
 
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
@@ -487,7 +430,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
         builder.cRLDPEnabled(false)
                 .cRLEnabled(true)
-                .cRLFilePath(getEmptyCrlPath())
+                .cRLFilePath(EMPTY_CRL_PATH)
                 .oCSPEnabled(false)
                 .setSubjectDNEmailAsUserIdentitySource()
                 .setUsernameOrEmailUserIdentityMapper();
@@ -501,7 +444,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals("test-user@localhost", loginConfirmationPage.getUsernameText());
         Assert.assertTrue(loginConfirmationPage.getLoginDelayCounterText().startsWith("The form will be submitted"));
 
-        loginConfirmationPage.submit();
+        loginConfirmationPage.confirm();
 
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
@@ -513,7 +456,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
         builder.cRLDPEnabled(false)
                 .cRLEnabled(true)
-                .cRLFilePath(getSingleCertificateCrlPath())
+                .cRLFilePath(CLIENT_CRL_PATH)
                 .oCSPEnabled(false)
                 .setSubjectDNEmailAsUserIdentitySource()
                 .setUsernameOrEmailUserIdentityMapper();
