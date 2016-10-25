@@ -39,6 +39,8 @@
         <exclude.migration>**/migration/**/*Test.java</exclude.migration>
         <!--exclude cluster tests by default, enabled by 'auth-server-*-cluster' profiles in tests/pom.xml-->
         <exclude.cluster>**/cluster/**/*Test.java</exclude.cluster>
+        <!-- exclude x509 tests by default, enabled by 'ssl' profile -->
+        <exclude.x509>**/forms/x509/*Test.java</exclude.x509>
     </properties>
     
     <dependencies>
@@ -102,6 +104,7 @@
                         <exclude>${exclude.client}</exclude>
                         <exclude>${exclude.migration}</exclude>
                         <exclude>${exclude.cluster}</exclude>
+                        <exclude>${exclude.x509}</exclude>
                     </excludes>
                 </configuration>
             </plugin>
