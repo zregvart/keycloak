@@ -136,7 +136,6 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             }
 
             if (invalidUser(context, user)) {
-                context.getEvent().error(Errors.INVALID_USER_CREDENTIALS);
                 // TODO use specific locale to load error messages
                 String errorMessage = "X509 certificate authentication's failed.";
                 // TODO is calling form().setErrors enough to show errors on login screen?

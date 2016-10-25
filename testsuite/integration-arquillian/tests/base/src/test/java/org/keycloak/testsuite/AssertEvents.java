@@ -51,6 +51,7 @@ public class AssertEvents implements TestRule {
     public static final String DEFAULT_USERNAME = "test-user@localhost";
 
     String defaultRedirectUri = "http://localhost:8180/auth/realms/master/app/auth";
+    String defaultSslRedirectUri = "https://localhost:8543/auth/realms/master/app/auth";
 
     private AbstractKeycloakTest context;
 
@@ -103,6 +104,17 @@ public class AssertEvents implements TestRule {
                 //.detail(Details.AUTH_METHOD, OIDCLoginProtocol.LOGIN_PROTOCOL)
                 //.detail(Details.AUTH_TYPE, AuthorizationEndpoint.CODE_AUTH_TYPE)
                 .detail(Details.REDIRECT_URI, defaultRedirectUri)
+                .detail(Details.CONSENT, Details.CONSENT_VALUE_NO_CONSENT_REQUIRED)
+                .session(isUUID());
+    }
+
+    public ExpectedEvent expectSslLogin() {
+        return expect(EventType.LOGIN)
+                .detail(Details.CODE_ID, isCodeId())
+                //.detail(Details.USERNAME, DEFAULT_USERNAME)
+                //.detail(Details.AUTH_METHOD, OIDCLoginProtocol.LOGIN_PROTOCOL)
+                //.detail(Details.AUTH_TYPE, AuthorizationEndpoint.CODE_AUTH_TYPE)
+                .detail(Details.REDIRECT_URI, defaultSslRedirectUri)
                 .detail(Details.CONSENT, Details.CONSENT_VALUE_NO_CONSENT_REQUIRED)
                 .session(isUUID());
     }
