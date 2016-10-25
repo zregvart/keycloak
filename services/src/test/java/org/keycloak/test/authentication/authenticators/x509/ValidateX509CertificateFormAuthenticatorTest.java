@@ -243,7 +243,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
 
         verify(events).detail(eq(Details.USERNAME), eq("username"));
         verify(clientSession).setNote(eq(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME), eq("username"));
-        verify(events).error(eq(Errors.INVALID_USER_CREDENTIALS));
+        verify(events).error(eq(Errors.USER_NOT_FOUND));
         verify(flowContext).attempted();
         //verify(flowContext,atLeastOnce()).challenge(any());
         verify(loginFormsProvider).setErrors(setErrorCaptor.capture());

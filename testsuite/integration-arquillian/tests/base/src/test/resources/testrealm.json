@@ -22,6 +22,9 @@
       "email" : "test-user@localhost",
       "firstName": "Tom",
       "lastName": "Brady",
+      "attributes" : {
+        "x509_certificate_identity" : [ "-" ]
+      },
       "credentials" : [
         { "type" : "password",
           "value" : "password" }
@@ -103,7 +106,8 @@
       "enabled": true,
       "baseUrl": "http://localhost:8180/auth/realms/master/app/auth",
       "redirectUris": [
-        "http://localhost:8180/auth/realms/master/app/auth/*"
+        "http://localhost:8180/auth/realms/master/app/auth/*",
+        "https://localhost:8543/auth/realms/master/app/auth/*"
       ],
       "adminUrl": "http://localhost:8180/auth/realms/master/app/admin",
       "secret": "password"
