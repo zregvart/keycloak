@@ -30,19 +30,19 @@ import org.openqa.selenium.support.FindBy;
  * @since 10/24/2016
  */
 
-public class X509LoginPage extends AbstractPage {
+public class X509IdentityConfirmationPage extends AbstractPage {
 
     @ArquillianResource
     protected OAuthClient oauth;
 
     @FindBy(id = "username")
-    private WebElement usernameInput;
+    private WebElement usernameText;
 
     @FindBy(name = "login")
-    protected WebElement continueButton;
+    private WebElement confirmButton;
 
     @FindBy(name = "cancel")
-    protected WebElement ignoreButton;
+    private WebElement ignoreButton;
 
     @FindBy(className = "alert-error")
     private WebElement loginErrorMessage;
@@ -62,15 +62,15 @@ public class X509LoginPage extends AbstractPage {
     @FindBy(id = "certificate_subjectDN")
     private WebElement certificateSubjectDistinguishedName;
 
-    public void submit() {
-        continueButton.click();
+    public void confirm() {
+        confirmButton.click();
     }
 
     public String getLoginDelayCounterText() {return loginDelayCounter.getText(); }
 
     public String getSubjectDistinguishedNameText() { return certificateSubjectDistinguishedName.getText(); }
 
-    public String getUsernameText() { return usernameInput.getText(); }
+    public String getUsernameText() { return usernameText.getText(); }
 
     public void ignore() {
         ignoreButton.click();
