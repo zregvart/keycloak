@@ -39,8 +39,10 @@ import org.keycloak.testsuite.pages.LoginPage;
 import org.keycloak.testsuite.util.AdminEventPaths;
 import org.keycloak.testsuite.util.AssertAdminEvents;
 import org.keycloak.testsuite.pages.x509.X509IdentityConfirmationPage;
+import org.keycloak.testsuite.util.UserBuilder;
 
 import javax.ws.rs.core.Response;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -126,6 +128,8 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
         UserRepresentation user = findUser("test-user@localhost");
         userId = user.getId();
+        user.singleAttribute("x509_certificate_identity","-");
+        updateUser(user);
     }
 
     private AuthenticationExecutionInfoRepresentation addAssertExecution(AuthenticationFlowRepresentation flow, String providerId, String requirement) {
@@ -158,6 +162,10 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
     @Override
     public void configureTestRealm(RealmRepresentation testRealm) {
+        ClientRepresentation client = findTestApp(testRealm);
+        URI baseUri = URI.create(client.getRedirectUris().get(0));
+        URI redir = URI.create("https://localhost:" + System.getProperty("app.server.https.port", "8543") + baseUri.getRawPath());
+        client.getRedirectUris().add(redir.toString());
     }
 
     AuthenticationFlowRepresentation copyFlow(String existingFlow, String newFlow) {
