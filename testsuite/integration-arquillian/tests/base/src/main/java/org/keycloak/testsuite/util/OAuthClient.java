@@ -32,8 +32,10 @@ import org.apache.http.message.BasicNameValuePair;
 import org.junit.Assert;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.RSATokenVerifier;
+import org.keycloak.adapters.HttpClientBuilder;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.common.VerificationException;
+import org.keycloak.common.util.KeystoreUtil;
 import org.keycloak.common.util.PemUtils;
 import org.keycloak.constants.AdapterConstants;
 import org.keycloak.jose.jws.JWSInput;
@@ -47,7 +49,6 @@ import org.keycloak.representations.RefreshToken;
 import org.keycloak.testsuite.arquillian.AuthServerTestEnricher;
 import org.keycloak.util.BasicAuthHelper;
 import org.keycloak.util.JsonSerialization;
-
 import org.keycloak.util.TokenUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -58,12 +59,9 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.KeyStore;
 import java.security.PublicKey;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author <a href="mailto:sthorger@redhat.com">Stian Thorgersen</a>
@@ -73,6 +71,7 @@ public class OAuthClient {
     public static final String SERVER_ROOT = AuthServerTestEnricher.getAuthServerContextRoot();
     public static final String AUTH_SERVER_ROOT = SERVER_ROOT + "/auth";
     public static final String APP_ROOT = AUTH_SERVER_ROOT + "/realms/master/app";
+    private static final boolean sslRequired = Boolean.parseBoolean(System.getProperty("auth.server.ssl.required"));
 
     private Keycloak adminClient;
 
@@ -148,8 +147,38 @@ public class OAuthClient {
         }
     }
 
+    private static CloseableHttpClient newCloseableHttpClient() {
+        if (sslRequired) {
+            KeyStore keystore = null;
+            // load the keystore containing the client certificate - keystore type is probably jks or pkcs12
+            String keyStorePath = System.getProperty("client.certificate.keystore");
+            String keyStorePassword = System.getProperty("client.certificate.keystore.passphrase");
+            try {
+                keystore = KeystoreUtil.loadKeyStore(keyStorePath, keyStorePassword);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            // load the trustore
+            KeyStore truststore = null;
+            String trustStorePath = System.getProperty("client.truststore");
+            String trustStorePassword = System.getProperty("client.truststore.passphrase");
+            try {
+                truststore = KeystoreUtil.loadKeyStore(trustStorePath, trustStorePassword);
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+            return (DefaultHttpClient)new HttpClientBuilder()
+                    .keyStore(keystore, keyStorePassword)
+                    .trustStore(truststore)
+                    .hostnameVerification(HttpClientBuilder.HostnameVerificationPolicy.ANY)
+                    .build();
+        }
+        return new DefaultHttpClient();
+    }
+
     public AccessTokenResponse doAccessTokenRequest(String code, String password) {
-        CloseableHttpClient client = new DefaultHttpClient();
+        CloseableHttpClient client = newCloseableHttpClient();
         try {
             HttpPost post = new HttpPost(getAccessTokenUrl());
 
@@ -250,7 +279,7 @@ public class OAuthClient {
 
     public AccessTokenResponse doGrantAccessTokenRequest(String realm, String username, String password, String totp,
                                                          String clientId, String clientSecret) throws Exception {
-        CloseableHttpClient client = new DefaultHttpClient();
+        CloseableHttpClient client = newCloseableHttpClient();
         try {
             HttpPost post = new HttpPost(getResourceOwnerPasswordCredentialGrantUrl(realm));
 

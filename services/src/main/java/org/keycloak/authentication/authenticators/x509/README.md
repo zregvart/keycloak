@@ -11,10 +11,14 @@ The implementation supports Browser and Direct Grant Flows.
 
 ## Features
 
- - Regular expression based user identity extraction using the certificate's fields: 
-    - Subject DN
-    - Issuer DN
-    - Serial Number
+ - Supported identity mapping strategies:
+   - Match SubjectDN using regular expression
+   - X500 Subject's e-mail attribute
+   - X500 Subject's Common Name attribute
+   - Match IssuerDN using regular expression
+   - X500 Issuer's e-mail attribute
+   - X500 Issuer's Common Name attribute
+   - Certificate Serial Number
  - Supported User Identity/User mappings:
     - User identity to Username or E-mail
     - User identity to User Custom Attribute
@@ -23,8 +27,6 @@ The implementation supports Browser and Direct Grant Flows.
  - Revocation status checking using OCSP/Responder URI
  - Certificate KeyUsage validation
  - Certificate ExtendedKeyUsage validation
- - Certificate PKI path validation
- - Certificate dates validation
 
 
 ## Configure WildFly to enable mutual SSL
@@ -80,10 +82,9 @@ optionally ask for a client certificate during SSL handshake.
 
 - A client sends an authentication request over SSL/TLS channel
 - During SSL/TLS handshake, the server and the client exchange their SSL/x.509/v3 digital certificates
-  used to encrypt the data used to establish a secret key .
-- The server validates the certificate according to certificate validation algorithm:
-  - Validate the certificate dates
-  - Validate the certificate trust path
+  used to encrypt the data used to establish a secret key.
+- The container (wildfly) validates the certificate PKIX path
+- The authenticator validates the client certificate as follows:
   - Check the certificate revocation status using CRL and/or CRL Distribution Points
   - Check the Certificate revocation status using OCSP
   - Validate certificate's key usage
@@ -97,17 +98,14 @@ optionally ask for a client certificate during SSL handshake.
 ### User Identity Extraction
 
 There are several ways to extract a user identity from a X509 certificate. Most common
-strategy is to use a regular expression to extract a username or an e-mail from the
-certificate subject's name . For example, the regular expression below
-will match the e-mail field of subject's DN:
+strategy is to use the Common Name or E-mail attribute from either Subject
+or Issuer DN.
+User identity can also be extracted by applying a regular expression to
+Subject Distinguished Name or Issuer Distinguished Name. For example, the
+regular expression below will match the e-mail field of subject's DN:
 ```
 emailAddress=(.*?)(?:,|$)
 ```
-
-Another strategy is to user the issuer's name to extract the user identity. This can
-be useful to map multiple certificates to a single user in keycloak.
-Lastly, the certificate's serial number can be used a the user identity.
-
 
 ### Mapping user identity to existing user
 
@@ -130,11 +128,6 @@ the extracted user identity.
 * Make a copy of "Direct Grant" flow and enter "x509 Direct Grant" to be the name of the new flow
 * Delete "Validate Username" and "Password" authenticators
 * Click on "Execution" and add "X509/Validate Username" and sets the type to "REQUIRED"
-* Optionally, you can validate that the certificate thumbprint matches the thumbprint of a
-  certificate associated with user. Click on "Execution", add "X509 Validate Thumbprint"
-  and set its type to "REQUIRED".
-
-* Note: the details how to bind certificate thumbprint to a particular user are not covered here.
 
 To verify Direct Grant, run the following command:
 
@@ -152,11 +145,9 @@ $ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --
 * [client_cert].crt is a public client certificate in PEM format
 * [client_cert].key is private key in PEM format
 
-## Running the tests
-
-TBD
+## Running the X509 integration tests
 
 ``` 
-$ mvn test -f testsuite/integration-arquillian/tests/base/pom.xml -Dtest=\*X509Cert\*
+$ mvn clean install -f testsuite/integration-arquillian/pom.xml -Pauth-server-wildfly -Dauth.server.ssl.required -Dtest=*X509*
 ```
 
