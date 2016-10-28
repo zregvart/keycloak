@@ -67,21 +67,20 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 return;
             }
 
-            Map<String, String> parameters = null;
-
-            AuthenticatorConfigModel config;
-            if ((config = context.getAuthenticatorConfig()) != null) {
-                parameters = config.getConfig();
+            X509AuthenticatorConfigModel config = null;
+            if (context.getAuthenticatorConfig() != null && context.getAuthenticatorConfig().getConfig() != null) {
+                config = new X509AuthenticatorConfigModel(context.getAuthenticatorConfig());
             }
-            if (parameters == null) {
+            if (config == null) {
                 logger.warn("[X509ClientCertificateAuthenticator:authenticate] x509 Client Certificate Authentication configuration is not available.");
+                context.challenge(createInfoResponse(context, "X509 client authentication has not been configured yet"));
                 context.attempted();
                 return;
             }
 
             // Validate X509 client certificate
             try {
-                CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(parameters);
+                CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(config);
                 CertificateValidator validator = builder.build(certs);
                 validator.checkRevocationStatus()
                          .validateKeyUsage()
@@ -108,7 +107,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 return;
             }
 
-            Object userIdentity = getUserIdentityExtractor(parameters).extractUserIdentity(certs);
+            Object userIdentity = getUserIdentityExtractor(config).extractUserIdentity(certs);
             if (userIdentity == null) {
                 logger.warnf("[X509ClientCertificateAuthenticator:authenticate] Unable to extract user identity from certificate.");
                 // TODO use specific locale to load error messages
@@ -123,7 +122,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
             try {
                 context.getEvent().detail(Details.USERNAME, userIdentity.toString());
                 context.getClientSession().setNote(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME, userIdentity.toString());
-                user = getUserIdentityToModelMapper(parameters).find(context, userIdentity);
+                user = getUserIdentityToModelMapper(config).find(context, userIdentity);
             }
             catch(ModelDuplicateException e) {
                 logger.modelDuplicateException(e);
@@ -168,17 +167,25 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 }
             }
             context.setUser(user);
-            // FIXME calling forceChallenge was the only way to display
-            // a form to let users either choose the user identity from certificate
-            // or to ignore it and proceed to a normal login screen. Attempting
-            // to call the method "challenge" results in a wrong/unexpected behavior.
-            // The question is whether calling "forceChallenge" here is ok from
-            // the design viewpoint?
-            context.getClientSession().setNote(AuthenticationProcessor.CURRENT_AUTHENTICATION_EXECUTION, context.getExecution().getId());
-            context.forceChallenge(createSuccessResponse(context, certs[0].getSubjectDN().getName()));
-            // Do not set the flow status yet, we want to display a form to let users
-            // choose whether to accept the identity from certificate or to specify username/password explicitly
-            ////context.success();
+
+            // Check whether to display the identity confirmation
+            if (!config.getConfirmationPageDisallowed()) {
+                // FIXME calling forceChallenge was the only way to display
+                // a form to let users either choose the user identity from certificate
+                // or to ignore it and proceed to a normal login screen. Attempting
+                // to call the method "challenge" results in a wrong/unexpected behavior.
+                // The question is whether calling "forceChallenge" here is ok from
+                // the design viewpoint?
+                context.getClientSession().setNote(AuthenticationProcessor.CURRENT_AUTHENTICATION_EXECUTION, context.getExecution().getId());
+                context.forceChallenge(createSuccessResponse(context, certs[0].getSubjectDN().getName()));
+                // Do not set the flow status yet, we want to display a form to let users
+                // choose whether to accept the identity from certificate or to specify username/password explicitly
+                ////context.success();
+            }
+            else {
+                // Bypass the confirmation page and log the user in
+                context.success();
+            }
         }
         catch(Exception e) {
             logger.errorf("[X509ClientCertificateAuthenticator:authenticate] Exception: %s", e.getMessage());

@@ -23,11 +23,17 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
+import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.*;
+import org.keycloak.models.utils.FormMessage;
 import org.keycloak.services.ServicesLogger;
+
+import javax.ws.rs.core.Response;
 import java.security.KeyStore;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -65,36 +71,36 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
     public static final String CERTIFICATE_KEY_USAGE = "x509-cert-auth.keyusage";
     public static final String CERTIFICATE_EXTENDED_KEY_USAGE = "x509-cert-auth.extendedkeyusage";
     static final String DEFAULT_MATCH_ALL_EXPRESSION = "(.*?)(?:$)";
-//    public static final String EMAIL_PATTERN = "(?:emailAddress|E)=(.*?)(?:,|$)";
-//    public static final String CN_PATTERN = "CN=(.*?)(?:,|$)";
+    public static final String CONFIRMATION_PAGE_DISALLOWED = "x509-cert-auth.confirmation-page-disallowed";
 
-    protected static String firstOrDefault(String value, String defaultValue) {
 
-        return value != null && value.trim().length() > 0 ? value : defaultValue;
+    protected Response createInfoResponse(AuthenticationFlowContext context, String infoMessage, Object ... parameters) {
+        LoginFormsProvider form = context.form();
+        return form.setInfo(infoMessage, parameters).createInfoPage();
     }
 
     protected static class CertificateValidatorConfigBuilder {
 
-        static CertificateValidator.CertificateValidatorBuilder fromConfig(Map<String, String> config) throws Exception {
+        static CertificateValidator.CertificateValidatorBuilder fromConfig(X509AuthenticatorConfigModel config) throws Exception {
 
             CertificateValidator.CertificateValidatorBuilder builder = new CertificateValidator.CertificateValidatorBuilder();
             return builder
                     .keyUsage()
-                        .parse(config.get(CERTIFICATE_KEY_USAGE))
+                        .parse(config.getKeyUsage())
                     .extendedKeyUsage()
-                        .parse(config.get(CERTIFICATE_EXTENDED_KEY_USAGE))
+                        .parse(config.getExtendedKeyUsage())
                     .revocation()
-                        .cRLEnabled(config.get(ENABLE_CRL))
-                        .cRLDPEnabled(config.get(ENABLE_CRLDP))
-                        .cRLrelativePath(config.get(CRL_RELATIVE_PATH))
-                        .oCSPEnabled(config.get(ENABLE_OCSP))
-                        .oCSPResponderURI(config.get(OCSPRESPONDER_URI));
+                        .cRLEnabled(config.getCRLEnabled())
+                        .cRLDPEnabled(config.getCRLDistributionPointEnabled())
+                        .cRLrelativePath(config.getCRLRelativePath())
+                        .oCSPEnabled(config.getOCSPEnabled())
+                        .oCSPResponderURI(config.getOCSPResponder());
         }
     }
 
     // The method is purely for purposes of facilitating the unit testing
-    public CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(Map<String,String> parameters) throws Exception {
-        return CertificateValidatorConfigBuilder.fromConfig(parameters);
+    public CertificateValidator.CertificateValidatorBuilder certificateValidationParameters(X509AuthenticatorConfigModel config) throws Exception {
+        return CertificateValidatorConfigBuilder.fromConfig(config);
     }
 
     protected static class UserIdentityExtractorBuilder {
@@ -117,41 +123,41 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
             return null;
         };
 
-        static UserIdentityExtractor fromConfig(Map<String,String> parameters) {
+        static UserIdentityExtractor fromConfig(X509AuthenticatorConfigModel config) {
 
-            String userIdentitySource = firstOrDefault(parameters.get(MAPPING_SOURCE_SELECTION),MAPPING_SOURCE_CERT_SUBJECTDN);
-            String pattern = firstOrDefault(parameters.get(REGULAR_EXPRESSION),DEFAULT_MATCH_ALL_EXPRESSION);
+            X509AuthenticatorConfigModel.MappingSourceType userIdentitySource = config.getMappingSourceType();
+            String pattern = config.getRegularExpression();
 
             UserIdentityExtractor extractor = null;
             switch(userIdentitySource) {
 
-                case MAPPING_SOURCE_CERT_SUBJECTDN:
+                case SUBJECTDN:
                     extractor = UserIdentityExtractor.getPatternIdentityExtractor(pattern, certs -> certs[0].getSubjectDN().getName());
                     break;
-                case MAPPING_SOURCE_CERT_ISSUERDN:
+                case ISSUERDN:
                     extractor = UserIdentityExtractor.getPatternIdentityExtractor(pattern, certs -> certs[0].getIssuerDN().getName());
                     break;
-                case MAPPING_SOURCE_CERT_SERIALNUMBER:
+                case SERIALNUMBER:
                     extractor = UserIdentityExtractor.getPatternIdentityExtractor(DEFAULT_MATCH_ALL_EXPRESSION, certs -> certs[0].getSerialNumber().toString());
                     break;
-                case MAPPING_SOURCE_CERT_SUBJECTDN_CN:
+                case SUBJECTDN_CN:
                     extractor = UserIdentityExtractor.getX500NameExtractor(BCStyle.CN, subject);
                     break;
-                case MAPPING_SOURCE_CERT_SUBJECTDN_EMAIL:
+                case SUBJECTDN_EMAIL:
                     extractor = UserIdentityExtractor
                             .either(UserIdentityExtractor.getX500NameExtractor(BCStyle.EmailAddress, subject))
                             .or(UserIdentityExtractor.getX500NameExtractor(BCStyle.E, subject));
                     break;
-                case MAPPING_SOURCE_CERT_ISSUERDN_CN:
+                case ISSUERDN_CN:
                     extractor = UserIdentityExtractor.getX500NameExtractor(BCStyle.CN, issuer);
                     break;
-                case MAPPING_SOURCE_CERT_ISSUERDN_EMAIL:
+                case ISSUERDN_EMAIL:
                     extractor = UserIdentityExtractor
                             .either(UserIdentityExtractor.getX500NameExtractor(BCStyle.EmailAddress, issuer))
                             .or(UserIdentityExtractor.getX500NameExtractor(BCStyle.E, issuer));
                     break;
                 default:
-                    logger.warnf("[UserIdentityExtractorBuilder:fromConfig] Unknown or unsupported user identity source: \"%s\"", userIdentitySource);
+                    logger.warnf("[UserIdentityExtractorBuilder:fromConfig] Unknown or unsupported user identity source: \"%s\"", userIdentitySource.getName());
                     break;
             }
             return extractor;
@@ -160,21 +166,21 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
 
     protected static class UserIdentityToModelMapperBuilder {
 
-        static UserIdentityToModelMapper fromConfig(Map<String,String> parameters) {
+        static UserIdentityToModelMapper fromConfig(X509AuthenticatorConfigModel config) {
 
-            String mapperType = firstOrDefault(parameters.get(USER_MAPPER_SELECTION),USERNAME_EMAIL_MAPPER);
-            String attributeName = firstOrDefault(parameters.get(CUSTOM_ATTRIBUTE_NAME),DEFAULT_ATTRIBUTE_NAME);
+            X509AuthenticatorConfigModel.IdentityMapperType mapperType = config.getUserIdentityMapperType();
+            String attributeName = config.getCustomAttributeName();
 
             UserIdentityToModelMapper mapper = null;
             switch (mapperType) {
-                case USER_ATTRIBUTE_MAPPER:
+                case USER_ATTRIBUTE:
                     mapper = UserIdentityToModelMapper.getUserIdentityToCustomAttributeMapper(attributeName);
                     break;
-                case USERNAME_EMAIL_MAPPER:
+                case USERNAME_EMAIL:
                     mapper = UserIdentityToModelMapper.getUsernameOrEmailMapper();
                     break;
                 default:
-                    logger.warnf("[UserIdentityToModelMapperBuilder:fromConfig] Unknown or unsupported user identity mapper: \"%s\"", mapperType);
+                    logger.warnf("[UserIdentityToModelMapperBuilder:fromConfig] Unknown or unsupported user identity mapper: \"%s\"", mapperType.getName());
             }
             return mapper;
         }
@@ -198,12 +204,12 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
         return certs;
     }
     // Purely for unit testing
-    public UserIdentityExtractor getUserIdentityExtractor(Map<String, String> parameters) {
-        return UserIdentityExtractorBuilder.fromConfig(parameters);
+    public UserIdentityExtractor getUserIdentityExtractor(X509AuthenticatorConfigModel config) {
+        return UserIdentityExtractorBuilder.fromConfig(config);
     }
     // Purely for unit testing
-    public UserIdentityToModelMapper getUserIdentityToModelMapper(Map<String,String> parameters) {
-        return UserIdentityToModelMapperBuilder.fromConfig(parameters);
+    public UserIdentityToModelMapper getUserIdentityToModelMapper(X509AuthenticatorConfigModel config) {
+        return UserIdentityToModelMapperBuilder.fromConfig(config);
     }
     @Override
     public boolean requiresUser() {

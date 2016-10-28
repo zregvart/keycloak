@@ -632,24 +632,21 @@ public class CertificateValidator {
                 _parent = parent;
             }
 
-            public GotCRL cRLEnabled(String value) {
-                if (value != null)
-                    _crlCheckingEnabled = Boolean.parseBoolean(value);
+            public GotCRL cRLEnabled(boolean value) {
+                _crlCheckingEnabled = value;
                 return new GotCRL();
             }
 
             public class GotCRL {
-                public GotCRLDP cRLDPEnabled(String value) {
-                    if (value != null)
-                        _crldpEnabled = Boolean.parseBoolean(value);
+                public GotCRLDP cRLDPEnabled(boolean value) {
+                    _crldpEnabled = value;
                     return new GotCRLDP();
                 }
             }
 
             public class GotCRLRelativePath {
-                public GotOCSP oCSPEnabled(String value) {
-                    if (value != null)
-                        _ocspEnabled = Boolean.parseBoolean(value);
+                public GotOCSP oCSPEnabled(boolean value) {
+                    _ocspEnabled = value;
                     return new GotOCSP();
                 }
             }

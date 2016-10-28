@@ -144,6 +144,12 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         extendedKeyUsage.setLabel("Validate Extended Key Usage");
         extendedKeyUsage.setHelpText("Validates the extended purposes of the certificate's key using certificate's Extended Key Usage extension. Leaving the field blank will disable Extended Key Usage validation. See RFC 5280 for a detailed definition of X509 Extended Key Usage extension.");
 
+        ProviderConfigProperty identityConfirmationPageDisallowed = new ProviderConfigProperty();
+        identityConfirmationPageDisallowed.setType(BOOLEAN_TYPE);
+        identityConfirmationPageDisallowed.setName(CONFIRMATION_PAGE_DISALLOWED);
+        identityConfirmationPageDisallowed.setLabel("Bypass identity confirmation");
+        identityConfirmationPageDisallowed.setHelpText("By default, the user will prompted to confirm his/here identity extracted from X509 client certificate. The option allows to bypass the identity confirmation.");
+
         configProperties = asList(mappingMethodList,
                 regExp,
                 userMapperList,
@@ -154,7 +160,8 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
                 oCspCheckingEnabled,
                 ocspResponderUri,
                 keyUsage,
-                extendedKeyUsage);
+                extendedKeyUsage,
+                identityConfirmationPageDisallowed);
     }
 
     @Override

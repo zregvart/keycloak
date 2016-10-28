@@ -80,8 +80,9 @@
         <skip.add.user.json>false</skip.add.user.json>
 
         <client.certificate.keystore>${auth.server.config.dir}/client.jks</client.certificate.keystore>
-        <client.certificate.keystore.password>secret</client.certificate.keystore.password>
-
+        <client.certificate.keystore.passphrase>secret</client.certificate.keystore.passphrase>
+        <client.truststore>${auth.server.config.dir}/keycloak.truststore</client.truststore>
+        <client.truststore.passphrase>secret</client.truststore.passphrase>
         <client.certificate.ca.path>${auth.server.config.dir}/ca.crt</client.certificate.ca.path>
         <client.certificate.file>${auth.server.config.dir}/client.crt</client.certificate.file>
         <client.key.file>${auth.server.config.dir}/client.key</client.key.file>
@@ -192,8 +193,9 @@
 
                             <client.certificate.ca.path>${client.certificate.ca.path}</client.certificate.ca.path>
                             <client.certificate.keystore>${client.certificate.keystore}</client.certificate.keystore>
-                            <client.certificate.keystore.password>${client.certificate.keystore.password}</client.certificate.keystore.password>
-
+                            <client.certificate.keystore.passphrase>${client.certificate.keystore.passphrase}</client.certificate.keystore.passphrase>
+                            <client.truststore>${client.truststore}</client.truststore>
+                            <client.truststore.passphrase>${client.truststore.passphrase}</client.truststore.passphrase>
                             <client.certificate.file>${client.certificate.file}</client.certificate.file>
                             <client.key.file>${client.key.file}</client.key.file>
                             <client.key.passphrase>${client.key.passphrase}</client.key.passphrase>
