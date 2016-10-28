@@ -149,6 +149,7 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
 
         verify(events, never()).error(any());
         verify(flowContext).attempted();
+        verify(loginFormsProvider).setInfo(any());
     }
 
     private void testErrorResponseOnCertificateValidationException(ConsumerThatThrows<CertificateValidator> action) throws GeneralSecurityException {

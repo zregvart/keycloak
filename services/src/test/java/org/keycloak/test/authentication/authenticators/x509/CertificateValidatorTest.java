@@ -275,10 +275,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testExceptionOnNullCrlPath() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(false)
                     .cRLrelativePath(null)
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                 .build(clientCertificates);
         validator.checkRevocationStatus();
@@ -288,10 +288,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testExceptionOnEmptyCrlPath() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .revocation()
-                .cRLEnabled("true")
-                .cRLDPEnabled("false")
+                .cRLEnabled(true)
+                .cRLDPEnabled(false)
                 .cRLrelativePath("")
-                .oCSPEnabled("false")
+                .oCSPEnabled(false)
                 .oCSPResponderURI("")
                 .build(clientCertificates);
         validator.checkRevocationStatus();
@@ -301,10 +301,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testExceptionOnBadCrlPath() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .revocation()
-                .cRLEnabled("true")
-                .cRLDPEnabled("false")
+                .cRLEnabled(true)
+                .cRLDPEnabled(false)
                 .cRLrelativePath("some bad path")
-                .oCSPEnabled("false")
+                .oCSPEnabled(false)
                 .oCSPResponderURI("")
                 .build(clientCertificates);
         validator.checkRevocationStatus();
@@ -314,10 +314,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
     public void testCRLRevocation() throws GeneralSecurityException {
         CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                 .revocation()
-                .cRLEnabled("true")
-                .cRLDPEnabled("false")
+                .cRLEnabled(true)
+                .cRLDPEnabled(false)
                 .cRLLoader(new CertificateValidator.CRLLoaderProxy(_crl))
-                .oCSPEnabled("false")
+                .oCSPEnabled(false)
                 .oCSPResponderURI("")
                 .build(clientCertificates);
         validator.checkRevocationStatus();
@@ -335,10 +335,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
 
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("true")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(true)
                     .cRLLoader(new CertificateValidator.CRLLoaderProxy(_crl))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
             validator.checkRevocationStatus();
@@ -361,10 +361,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
 
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("true")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(true)
                     .cRLLoader(new CertificateValidator.CRLLoaderProxy(_crl))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
             validator.checkRevocationStatus();
@@ -386,10 +386,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
 
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("true")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(true)
                     .cRLLoader(new CertificateValidator.CRLLoaderProxy(_crl))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
             validator.checkRevocationStatus();
@@ -406,11 +406,11 @@ public class CertificateValidatorTest extends AbstractX509Test {
         try {
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(false)
                     .cRLLoader(new CertificateValidator.CRLFileLoader("ldap://irrelevant",
                             new CertificateValidator.LdapContext(MockInitialDirContextFactory.class.getName())))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
 
@@ -433,11 +433,11 @@ public class CertificateValidatorTest extends AbstractX509Test {
         try {
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(false)
                     .cRLLoader(new CertificateValidator.CRLFileLoader("ldap://irrelevant",
                             new CertificateValidator.LdapContext(MockInitialDirContextFactory.class.getName())))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
 
@@ -461,11 +461,11 @@ public class CertificateValidatorTest extends AbstractX509Test {
         try {
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("true")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(true)
+                    .cRLDPEnabled(false)
                     .cRLLoader(new CertificateValidator.CRLFileLoader(ldapUrl.toString(),
                             new CertificateValidator.LdapContext(MockInitialDirContextFactory.class.getName())))
-                    .oCSPEnabled("false")
+                    .oCSPEnabled(false)
                     .oCSPResponderURI("")
                     .build(clientCertificates);
 
@@ -488,10 +488,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
         try {
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("false")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(false)
+                    .cRLDPEnabled(false)
                     .cRLrelativePath(null)
-                    .oCSPEnabled("true")
+                    .oCSPEnabled(true)
                     .oCSPResponderURI("")
                     .build(new X509Certificate[] { rootCertificate });
 
@@ -514,10 +514,10 @@ public class CertificateValidatorTest extends AbstractX509Test {
 
             CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
                     .revocation()
-                    .cRLEnabled("false")
-                    .cRLDPEnabled("false")
+                    .cRLEnabled(false)
+                    .cRLDPEnabled(false)
                     .cRLrelativePath(null)
-                    .oCSPEnabled("true")
+                    .oCSPEnabled(true)
                     .oCSPResponderURI(null)
                     .build(clientCertificates);
 
