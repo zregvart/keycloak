@@ -142,8 +142,6 @@ public class ProvidersTest extends AbstractAuthenticationTest {
                 "Validates a username and password from login form.");
         addProviderInfo(result, "auth-x509-client-username-form", "X509/Validate Username Form",
                 "Validates username and password from X509 client certificate received as a part of mutual SSL handshake.");
-        addProviderInfo(result, "direct-grant-auth-x509-thumbprint", "X509/Validates Certificate Thumbprint",
-                "Validates that X509 client certificate thumbprint matches the thumbprint of a X509 certificate associated with the user.");
         addProviderInfo(result, "direct-grant-auth-x509-username", "X509/Validate Username",
                 "Validates username and password from X509 client certificate received as a part of mutual SSL handshake.");
         addProviderInfo(result, "direct-grant-validate-otp", "OTP", "Validates the one time password supplied as a 'totp' form parameter in direct grant request");
