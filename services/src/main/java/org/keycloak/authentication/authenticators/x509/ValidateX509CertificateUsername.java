@@ -56,13 +56,11 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             return;
         }
 
-        Map<String, String> parameters = null;
-
-        AuthenticatorConfigModel config;
-        if ((config = context.getAuthenticatorConfig()) != null) {
-            parameters = config.getConfig();
+        X509AuthenticatorConfigModel config = null;
+        if (context.getAuthenticatorConfig() != null && context.getAuthenticatorConfig().getConfig() != null) {
+            config = new X509AuthenticatorConfigModel(context.getAuthenticatorConfig());
         }
-        if (parameters == null) {
+        if (config == null) {
             logger.warn("[ValidateX509CertificateUsername:authenticate] x509 Client Certificate Authentication configuration is not available.");
             context.getEvent().error(Errors.USER_NOT_FOUND);
             Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", "Configuration is missing.");
@@ -71,7 +69,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         }
         // Validate X509 client certificate
         try {
-            CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(parameters);
+            CertificateValidator.CertificateValidatorBuilder builder = certificateValidationParameters(config);
             CertificateValidator validator = builder.build(certs);
             validator.checkRevocationStatus()
                     .validateKeyUsage()
@@ -94,7 +92,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             return;
         }
 
-        Object userIdentity = getUserIdentityExtractor(parameters).extractUserIdentity(certs);
+        Object userIdentity = getUserIdentityExtractor(config).extractUserIdentity(certs);
         if (userIdentity == null) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Unable to extract user identity from certificate.");
             // TODO use specific locale to load error messages
@@ -107,7 +105,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         try {
             context.getEvent().detail(Details.USERNAME, userIdentity.toString());
             context.getClientSession().setNote(AbstractUsernameFormAuthenticator.ATTEMPTED_USERNAME, userIdentity.toString());
-            user = getUserIdentityToModelMapper(parameters).find(context, userIdentity);
+            user = getUserIdentityToModelMapper(config).find(context, userIdentity);
         }
         catch(ModelDuplicateException e) {
             logger.modelDuplicateException(e);

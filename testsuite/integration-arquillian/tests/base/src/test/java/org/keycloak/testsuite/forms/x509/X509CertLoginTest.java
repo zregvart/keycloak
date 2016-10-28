@@ -20,15 +20,19 @@ package org.keycloak.testsuite.forms.x509;
 
 import org.jboss.arquillian.graphene.page.Page;
 import org.jboss.logging.Logger;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.resource.AuthenticationManagementResource;
+import org.keycloak.authentication.AuthenticationFlow;
+import org.keycloak.authentication.authenticators.x509.ValidateX509CertificateUsernameFactory;
+import org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel;
 import org.keycloak.authentication.authenticators.x509.X509ClientCertificateAuthenticatorFactory;
 import org.keycloak.events.Details;
+import org.keycloak.events.Errors;
 import org.keycloak.events.admin.OperationType;
+import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.representations.AccessToken;
+import org.keycloak.representations.RefreshToken;
 import org.keycloak.representations.idm.*;
 import org.keycloak.testsuite.AssertEvents;
 import org.keycloak.testsuite.TestRealmKeycloakTest;
@@ -36,21 +40,18 @@ import org.keycloak.testsuite.admin.ApiUtil;
 import org.keycloak.testsuite.pages.AppPage;
 import org.keycloak.testsuite.pages.ErrorPage;
 import org.keycloak.testsuite.pages.LoginPage;
-import org.keycloak.testsuite.util.AdminEventPaths;
-import org.keycloak.testsuite.util.AssertAdminEvents;
+import org.keycloak.testsuite.util.*;
 import org.keycloak.testsuite.pages.x509.X509IdentityConfirmationPage;
-import org.keycloak.testsuite.util.UserBuilder;
 
 import javax.ws.rs.core.Response;
 import java.net.URI;
 import java.net.URLDecoder;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
-import static org.keycloak.authentication.authenticators.x509.AbstractX509ClientCertificateAuthenticator.*;
+import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USERNAME_EMAIL;
+import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USER_ATTRIBUTE;
+import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.MappingSourceType.*;
 
 /**
  * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
@@ -72,8 +73,6 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
     // TODO move to a base class
     public static final String REALM_NAME = "test";
 
-    private static final String CONFIG_DIR = System.getProperty("auth.server.config.dir");
-
     @Page
     protected AppPage appPage;
 
@@ -88,10 +87,13 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
     private static String userId;
 
+    private static String userId2;
+
     AuthenticationManagementResource authMgmtResource;
 
-    AuthenticationExecutionInfoRepresentation x509ExecutionStep;
+    AuthenticationExecutionInfoRepresentation browserExecution;
 
+    AuthenticationExecutionInfoRepresentation directGrantExecution;
     @Rule
     public AssertEvents events = new AssertEvents(this);
 
@@ -105,7 +107,7 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         AuthenticationFlowRepresentation browserFlow = copyBrowserFlow();
         Assert.assertNotNull(browserFlow);
 
-        AuthenticationFlowRepresentation directGrantFlow = copyDirectGrantFlow();
+        AuthenticationFlowRepresentation directGrantFlow = createDirectGrantFlow();
         Assert.assertNotNull(directGrantFlow);
 
         setBrowserFlow(browserFlow);
@@ -113,21 +115,31 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
         setDirectGrantFlow(directGrantFlow);
         Assert.assertEquals(testRealm().toRepresentation().getDirectGrantFlow(), directGrantFlow.getAlias());
+        Assert.assertEquals(0, directGrantFlow.getAuthenticationExecutions().size());
+
+        // Add X509 cert authenticator to the direct grant flow
+        directGrantExecution = addAssertExecution(directGrantFlow, ValidateX509CertificateUsernameFactory.PROVIDER_ID, REQUIRED);
+        Assert.assertNotNull(directGrantExecution);
+
+        directGrantFlow = authMgmtResource.getFlow(directGrantFlow.getId());
+        Assert.assertNotNull(directGrantFlow.getAuthenticationExecutions());
+        Assert.assertEquals(1, directGrantFlow.getAuthenticationExecutions().size());
 
         // Add X509 authenticator to the browser flow
-        x509ExecutionStep = addAssertExecution(browserFlow, X509ClientCertificateAuthenticatorFactory.PROVIDER_ID, ALTERNATIVE);
-        Assert.assertNotNull(x509ExecutionStep);
+        browserExecution = addAssertExecution(browserFlow, X509ClientCertificateAuthenticatorFactory.PROVIDER_ID, ALTERNATIVE);
+        Assert.assertNotNull(browserExecution);
 
         // Raise the priority of the authenticator to position it right before
         // the Username/password authentication
         // TODO find a better, more explicit way to specify the position
         // of authenticator within the flow relative to other authenticators
-        authMgmtResource.raisePriority(x509ExecutionStep.getId());
+        authMgmtResource.raisePriority(browserExecution.getId());
         // TODO raising the priority didn't generate the event?
         //assertAdminEvents.assertEvent(REALM_NAME, OperationType.UPDATE, AdminEventPaths.authRaiseExecutionPath(exec.getId()));
 
         UserRepresentation user = findUser("test-user@localhost");
         userId = user.getId();
+
         user.singleAttribute("x509_certificate_identity","-");
         updateUser(user);
     }
@@ -162,10 +174,53 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
     @Override
     public void configureTestRealm(RealmRepresentation testRealm) {
+
+        ClientRepresentation app = ClientBuilder.create()
+                .id(KeycloakModelUtils.generateId())
+                .clientId("resource-owner")
+                .directAccessGrants()
+                .secret("secret")
+                .build();
+
+        UserRepresentation user = UserBuilder.create()
+                .id("localhost")
+                .username("localhost")
+                .email("localhost@localhost")
+                .enabled(true)
+                .password("password")
+                .build();
+
+        userId2 = user.getId();
+
         ClientRepresentation client = findTestApp(testRealm);
         URI baseUri = URI.create(client.getRedirectUris().get(0));
         URI redir = URI.create("https://localhost:" + System.getProperty("app.server.https.port", "8543") + baseUri.getRawPath());
         client.getRedirectUris().add(redir.toString());
+
+        testRealm.setBruteForceProtected(true);
+        testRealm.setFailureFactor(2);
+
+        RealmBuilder.edit(testRealm)
+                .user(user)
+                .client(app);
+    }
+
+    AuthenticationFlowRepresentation createFlow(AuthenticationFlowRepresentation flowRep) {
+        Response response = authMgmtResource.createFlow(flowRep);
+        try {
+            org.keycloak.testsuite.Assert.assertEquals(201, response.getStatus());
+        }
+        finally {
+            response.close();
+        }
+        assertAdminEvents.assertEvent(REALM_NAME, OperationType.CREATE, AssertAdminEvents.isExpectedPrefixFollowedByUuid(AdminEventPaths.authFlowsPath()), flowRep);
+
+        for (AuthenticationFlowRepresentation flow : authMgmtResource.getFlows()) {
+            if (flow.getAlias().equalsIgnoreCase(flowRep.getAlias())) {
+                return flow;
+            }
+        }
+        return null;
     }
 
     AuthenticationFlowRepresentation copyFlow(String existingFlow, String newFlow) {
@@ -187,6 +242,22 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         return null;
     }
 
+    AuthenticationFlowRepresentation createDirectGrantFlow() {
+        AuthenticationFlowRepresentation newFlow = newFlow("Copy-of-direct-grant", "desc", AuthenticationFlow.BASIC_FLOW, true, false);
+        return createFlow(newFlow);
+    }
+
+    AuthenticationFlowRepresentation newFlow(String alias, String description,
+                                             String providerId, boolean topLevel, boolean builtIn) {
+        AuthenticationFlowRepresentation flow = new AuthenticationFlowRepresentation();
+        flow.setAlias(alias);
+        flow.setDescription(description);
+        flow.setProviderId(providerId);
+        flow.setTopLevel(topLevel);
+        flow.setBuiltIn(builtIn);
+        return flow;
+    }
+
     AuthenticationFlowRepresentation copyBrowserFlow() {
 
         RealmRepresentation realm = testRealm().toRepresentation();
@@ -197,11 +268,6 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         RealmRepresentation realm = testRealm().toRepresentation();
         realm.setBrowserFlow(flow.getAlias());
         testRealm().update(realm);
-    }
-
-    AuthenticationFlowRepresentation copyDirectGrantFlow() {
-        RealmRepresentation realm = testRealm().toRepresentation();
-        return copyFlow(realm.getDirectGrantFlow(), "Copy-of-direct-grant");
     }
 
     void setDirectGrantFlow(AuthenticationFlowRepresentation flow) {
@@ -228,16 +294,16 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         return ApiUtil.getCreatedId(resp);
     }
 
-    private void login(X509AuthenticatorConfigBuilder configBuilder) {
+    private void login(X509AuthenticatorConfigModel config, String userId, String username, String attemptedUsername) {
 
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", configBuilder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", config.getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         loginConfirmationPage.open();
 
         Assert.assertTrue(loginConfirmationPage.getSubjectDistinguishedNameText().startsWith("EMAILADDRESS=test-user@localhost"));
-        Assert.assertEquals("test-user@localhost", loginConfirmationPage.getUsernameText());
+        Assert.assertEquals(username, loginConfirmationPage.getUsernameText());
         Assert.assertTrue(loginConfirmationPage.getLoginDelayCounterText().startsWith("The form will be submitted"));
 
         loginConfirmationPage.confirm();
@@ -245,21 +311,24 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
 
-         events.expectSslLogin().user(userId).detail(Details.USERNAME, "test-user@localhost").assertEvent();
+         events.expectLogin()
+                 .user(userId)
+                 .detail(Details.USERNAME, attemptedUsername)
+                 .removeDetail(Details.REDIRECT_URI)
+                 .assertEvent();
     }
 
     @Test
-    public void loginWithX509CertSubjectEmail() throws Exception {
+    public void loginAsUserFromCertSubjectEmail() throws Exception {
         // Login using an e-mail extracted from certificate's subject DN
-        login(X509AuthenticatorConfigBuilder.defaultLoginSubjectEmail());
+        login(createLoginSubjectEmail2UsernameOrEmailConfig(), userId, "test-user@localhost", "test-user@localhost");
     }
 
     @Test
-    public void ignoreX509LoginContinueToFormLogin() throws Exception {
+    public void loginIgnoreX509IdentityContinueToFormLogin() throws Exception {
         // Set the X509 authenticator configuration
-        X509AuthenticatorConfigBuilder builder = X509AuthenticatorConfigBuilder.defaultLoginSubjectEmail();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", builder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         loginConfirmationPage.open();
@@ -274,26 +343,106 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
 
-         events.expectSslLogin().user(userId).detail(Details.USERNAME, "test-user@localhost").assertEvent();
+         events.expectLogin()
+                 .user(userId)
+                 .detail(Details.USERNAME, "test-user@localhost")
+                 .removeDetail(Details.REDIRECT_URI)
+                 .assertEvent();
     }
 
     @Test
-    public void loginWithX509CertSubjectCN() {
+    public void loginAsUserFromCertSubjectCN() {
         // Login using a CN extracted from certificate's subject DN
-        login(X509AuthenticatorConfigBuilder.defaultLoginSubjectCN());
+        login(createLoginSubjectCN2UsernameOrEmailConfig(), userId, "test-user@localhost", "test-user@localhost");
+    }
+
+    @Test
+    public void loginAsUserFromCertIssuerCN() {
+        login(createLoginIssuerCNToUsernameOrEmailConfig(), userId2, "localhost", "localhost");
+    }
+
+    @Test
+    public void loginAsUserFromCertIssuerCNMappedToUserAttribute() {
+
+        UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        this.updateUser(user);
+
+        login(createLoginIssuerDN_OU2CustomAttributeConfig(), userId2, "localhost", "Keycloak");
+    }
+
+    @Test
+    public void loginDuplicateUsersNotAllowed() {
+
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", createLoginIssuerDN_OU2CustomAttributeConfig().getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        // Set up the users so that the identity extracted from X509 client cert
+        // matches more than a single user to trigger DuplicateModelException.
+
+        UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        this.updateUser(user);
+
+        user = testRealm().users().get(userId).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        this.updateUser(user);
+
+        loginPage.open();
+
+        String expectedMessage = "X509 certificate authentication's failed.";
+        Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+
+        loginPage.login("test-user@localhost", "password");
+
+        Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
+        Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
+
+        events.expectLogin()
+                .user(userId)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
+    }
+
+    @Test
+    public void loginAttemptedNoConfig() {
+
+        loginConfirmationPage.open();
+        loginPage.assertCurrent();
+
+        String expectedMessage = "X509 client authentication has not been configured yet";
+        Assert.assertEquals(expectedMessage, loginPage.getInfoMessage().substring(0, expectedMessage.length()));
+        // Continue with form based login
+        loginPage.login("test-user@localhost", "password");
+
+        Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
+        Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
+        events.expectLogin()
+                .user(userId)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
     }
 
     @Test
     public void loginWithX509CertCustomAttributeUserNotFound() {
-        X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-        builder.cRLDPEnabled(false)
-                .cRLEnabled(false)
-                .oCSPEnabled(false)
-                .setIdentitySourceFromSubjectDNRegularExpression().regularExpression("O=(.*?)(?:,|$)")
-                .setCustomAttributeName("x509_certificate_identity")
-                .setCustomAttributeUserIdentityMapper();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", builder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                        .setConfirmationPageAllowed(true)
+                        .setMappingSourceType(SUBJECTDN)
+                        .setRegularExpression("O=(.*?)(?:,|$)")
+                        .setCustomAttributeName("x509_certificate_identity")
+                        .setUserIdentityMapperType(USER_ATTRIBUTE);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", config.getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         loginConfirmationPage.open();
@@ -304,9 +453,13 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
         String expectedMessage = "X509 certificate authentication's failed.";
         Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
-        events.expectSslLogin().user((String) null).session((String) null).error("user_not_found")
+        events.expectLogin()
+                .user((String) null)
+                .session((String) null)
+                .error("user_not_found")
                 .detail(Details.USERNAME, "Widgets Inc.")
                 .removeDetail(Details.CONSENT)
+                .removeDetail(Details.REDIRECT_URI)
                 .assertEvent();
 
         // Continue with form based login
@@ -314,20 +467,24 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
-        events.expectSslLogin().user(userId).detail(Details.USERNAME, "test-user@localhost").assertEvent();
+        events.expectLogin()
+                .user(userId)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
     }
 
     @Test
     public void loginWithX509CertCustomAttributeSuccess() {
-        X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-        builder.cRLDPEnabled(false)
-                .cRLEnabled(false)
-                .oCSPEnabled(false)
-                .setIdentitySourceFromSubjectDNRegularExpression().regularExpression("O=(.*?)(?:,|$)")
-                .setCustomAttributeName("x509_certificate_identity")
-                .setCustomAttributeUserIdentityMapper();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", builder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                        .setConfirmationPageAllowed(true)
+                        .setMappingSourceType(SUBJECTDN)
+                        .setRegularExpression("O=(.*?)(?:,|$)")
+                        .setCustomAttributeName("x509_certificate_identity")
+                        .setUserIdentityMapperType(USER_ATTRIBUTE);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", config.getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         // Update the attribute used to match the user identity to that
@@ -350,10 +507,9 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
     }
 
     @Test
-    public void loginWithX509CertUserMissing() {
-        X509AuthenticatorConfigBuilder configBuilder = X509AuthenticatorConfigBuilder.defaultLoginSubjectEmail();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", configBuilder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+    public void loginWithX509CertBadUserOrNotFound() {
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         // Delete user
@@ -375,9 +531,13 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         String expectedMessage = "X509 certificate authentication's failed.";
         Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
 
-        events.expectSslLogin().user((String) null).session((String) null).error("user_not_found")
+        events.expectLogin()
+                .user((String) null)
+                .session((String) null)
+                .error("user_not_found")
                 .detail(Details.USERNAME, "test-user@localhost")
                 .removeDetail(Details.CONSENT)
+                .removeDetail(Details.REDIRECT_URI)
                 .assertEvent();
 
         // Continue with form based login
@@ -395,9 +555,8 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         setUserEnabled("test-user@localhost", false);
 
         try {
-            X509AuthenticatorConfigBuilder configBuilder = X509AuthenticatorConfigBuilder.defaultLoginSubjectEmail();
-            AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", configBuilder.build());
-            String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+            AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
+            String cfgId = createConfig(browserExecution.getId(), cfg);
             Assert.assertNotNull(cfgId);
 
             loginConfirmationPage.open();
@@ -408,9 +567,13 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
             String expectedMessage = "X509 certificate authentication's failed.\nUser is disabled";
             Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
 
-            events.expectSslLogin().user(userId).session((String) null).error("user_disabled")
+            events.expectLogin()
+                    .user(userId)
+                    .session((String) null)
+                    .error("user_disabled")
                     .detail(Details.USERNAME, "test-user@localhost")
                     .removeDetail(Details.CONSENT)
+                    .removeDetail(Details.REDIRECT_URI)
                     .assertEvent();
 
             loginPage.login("test-user@localhost", "password");
@@ -423,9 +586,13 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
             // KEYCLOAK-2024
             Assert.assertEquals("Account is disabled, contact admin.", loginPage.getError());
 
-            events.expectSslLogin().user(userId).session((String) null).error("user_disabled")
+            events.expectLogin()
+                    .user(userId)
+                    .session((String) null)
+                    .error("user_disabled")
                     .detail(Details.USERNAME, "test-user@localhost")
                     .removeDetail(Details.CONSENT)
+                    .removeDetail(Details.REDIRECT_URI)
                     .assertEvent();
         } finally {
             setUserEnabled("test-user@localhost", true);
@@ -434,41 +601,27 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
 
     @Test
     public void loginWithX509WithEmptyRevocationList() {
-        X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-        builder.cRLDPEnabled(false)
-                .cRLEnabled(true)
-                .cRLFilePath(EMPTY_CRL_PATH)
-                .oCSPEnabled(false)
-                .setSubjectDNEmailAsUserIdentitySource()
-                .setUsernameOrEmailUserIdentityMapper();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", builder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
-        Assert.assertNotNull(cfgId);
-
-        loginConfirmationPage.open();
-
-        Assert.assertTrue(loginConfirmationPage.getSubjectDistinguishedNameText().startsWith("EMAILADDRESS=test-user@localhost"));
-        Assert.assertEquals("test-user@localhost", loginConfirmationPage.getUsernameText());
-        Assert.assertTrue(loginConfirmationPage.getLoginDelayCounterText().startsWith("The form will be submitted"));
-
-        loginConfirmationPage.confirm();
-
-        Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
-        Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
-        events.expectSslLogin().user(userId).detail(Details.USERNAME, "test-user@localhost").assertEvent();
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                        .setCRLEnabled(true)
+                        .setCRLRelativePath(EMPTY_CRL_PATH)
+                        .setConfirmationPageAllowed(true)
+                        .setMappingSourceType(SUBJECTDN_EMAIL)
+                        .setUserIdentityMapperType(USERNAME_EMAIL);
+        login(config, userId, "test-user@localhost", "test-user@localhost");
     }
 
     @Test
     public void loginCertificateRevoked() {
-        X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-        builder.cRLDPEnabled(false)
-                .cRLEnabled(true)
-                .cRLFilePath(CLIENT_CRL_PATH)
-                .oCSPEnabled(false)
-                .setSubjectDNEmailAsUserIdentitySource()
-                .setUsernameOrEmailUserIdentityMapper();
-        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", builder.build());
-        String cfgId = createConfig(x509ExecutionStep.getId(), cfg);
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                        .setCRLEnabled(true)
+                        .setCRLRelativePath(CLIENT_CRL_PATH)
+                        .setConfirmationPageAllowed(true)
+                        .setMappingSourceType(SUBJECTDN_EMAIL)
+                        .setUserIdentityMapperType(USERNAME_EMAIL);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", config.getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
         loginConfirmationPage.open();
@@ -486,7 +639,224 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
         Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
 
-        events.expectSslLogin().user(userId).detail(Details.USERNAME, "test-user@localhost").assertEvent();
+        events.expectLogin()
+                .user(userId)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
+    }
+
+    @Test
+    public void loginNoIdentityConfirmationPage() {
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                    .setConfirmationPageAllowed(false)
+                    .setMappingSourceType(SUBJECTDN_EMAIL)
+                    .setUserIdentityMapperType(USERNAME_EMAIL);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-browser-config", config.getConfig());
+        String cfgId = createConfig(browserExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        oauth.openLoginForm();
+        // X509 authenticator extracts the user identity, maps it to an existing
+        // user and automatically logs the user in without prompting to confirm
+        // the identity.
+        Assert.assertEquals(AppPage.RequestType.AUTH_RESPONSE, appPage.getRequestType());
+        Assert.assertNotNull(oauth.getCurrentQuery().get(OAuth2Constants.CODE));
+        events.expectLogin()
+                .user(userId)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
+    }
+
+    @Test
+    public void loginResourceOwnerPasswordFailedOnDuplicateUsers() throws Exception {
+
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginIssuerDN_OU2CustomAttributeConfig().getConfig());
+        String cfgId = createConfig(directGrantExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        // Set up the users so that the identity extracted from X509 client cert
+        // matches more than a single user to trigger DuplicateModelException.
+
+        UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        this.updateUser(user);
+
+        user = testRealm().users().get(userId).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        this.updateUser(user);
+
+        oauth.clientId("resource-owner");
+        OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+
+        assertEquals(401, response.getStatusCode());
+        assertEquals("invalid_request", response.getError());
+
+        String errorDesc = "X509 certificate authentication's failed.";
+        assertEquals(errorDesc, response.getErrorDescription().substring(0, errorDesc.length()));
+    }
+
+    @Test
+    public void loginResourceOwnerPasswordFailedOnInvalidUser() throws Exception {
+
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginIssuerDN_OU2CustomAttributeConfig().getConfig());
+        String cfgId = createConfig(directGrantExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "-");
+        this.updateUser(user);
+
+        oauth.clientId("resource-owner");
+        OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+
+        events.expectLogin()
+                .user((String) null)
+                .session((String) null)
+                .error(Errors.INVALID_USER_CREDENTIALS)
+                .client("resource-owner")
+                .removeDetail(Details.CODE_ID)
+                .removeDetail(Details.USERNAME)
+                .removeDetail(Details.CONSENT)
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
+
+        assertEquals(401, response.getStatusCode());
+        assertEquals("invalid_grant", response.getError());
+        assertEquals("Invalid user credentials", response.getErrorDescription());
+    }
+
+    @Test
+    public void loginResourceOwnerPasswordFailedDisabledUser() throws Exception {
+        setUserEnabled("test-user@localhost", false);
+
+        try {
+            AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
+            String cfgId = createConfig(directGrantExecution.getId(), cfg);
+            Assert.assertNotNull(cfgId);
+
+            oauth.clientId("resource-owner");
+            OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+
+            events.expectLogin()
+                    .user(userId)
+                    .session((String) null)
+                    .error(Errors.USER_DISABLED)
+                    .client("resource-owner")
+                    .detail(Details.USERNAME, "test-user@localhost")
+                    .removeDetail(Details.CODE_ID)
+                    .removeDetail(Details.CONSENT)
+                    .removeDetail(Details.REDIRECT_URI)
+                    .assertEvent();
+
+            assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatusCode());
+            assertEquals("invalid_grant", response.getError());
+            assertEquals("Account disabled", response.getErrorDescription());
+
+        } finally {
+            setUserEnabled("test-user@localhost", true);
+        }
+    }
+
+    private void loginResourceOwnerCredentialsForceTemporaryAccountLock() throws Exception {
+        X509AuthenticatorConfigModel config = new X509AuthenticatorConfigModel()
+                .setMappingSourceType(ISSUERDN)
+                .setRegularExpression("OU=(.*?)(?:,|$)")
+                .setUserIdentityMapperType(USER_ATTRIBUTE)
+                .setCustomAttributeName("x509_certificate_identity");
+
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", config.getConfig());
+        String cfgId = createConfig(directGrantExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        UserRepresentation user = testRealm().users().get(userId).toRepresentation();
+        Assert.assertNotNull(user);
+
+        user.singleAttribute("x509_certificate_identity", "-");
+        this.updateUser(user);
+
+        oauth.clientId("resource-owner");
+        OAuthClient.AccessTokenResponse response;
+        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+
+        events.clear();
+    }
+
+
+    @Test
+    @Ignore
+    public void loginResourceOwnerPasswordFailedTemporarilyDisabledUser() throws Exception {
+
+        loginResourceOwnerCredentialsForceTemporaryAccountLock();
+
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
+        String cfgId = createConfig(directGrantExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        oauth.clientId("resource-owner");
+        OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+
+        events.expectLogin()
+                .user(userId)
+                .session((String) null)
+                .error(Errors.USER_TEMPORARILY_DISABLED)
+                .detail(Details.USERNAME, "test-user@localhost")
+                .removeDetail(Details.CODE_ID)
+                .removeDetail(Details.CONSENT)
+                .removeDetail(Details.REDIRECT_URI)
+                .assertEvent();
+
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatusCode());
+        assertEquals("invalid_grant", response.getError());
+        assertEquals("Account temporarily disabled", response.getErrorDescription());
+    }
+
+
+    private void doResourceOwnerPasswordLogin(String clientId, String clientSecret, String login, String password) throws Exception {
+
+        oauth.clientId(clientId);
+        OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest(clientSecret, "", "", null);
+
+        assertEquals(200, response.getStatusCode());
+
+        AccessToken accessToken = oauth.verifyToken(response.getAccessToken());
+        RefreshToken refreshToken = oauth.verifyRefreshToken(response.getRefreshToken());
+
+        events.expectLogin()
+                .client(clientId)
+                .user(userId)
+                .session(accessToken.getSessionState())
+                .detail(Details.GRANT_TYPE, OAuth2Constants.PASSWORD)
+                .detail(Details.TOKEN_ID, accessToken.getId())
+                .detail(Details.REFRESH_TOKEN_ID, refreshToken.getId())
+                .detail(Details.USERNAME, login)
+                .removeDetail(Details.CODE_ID)
+                .removeDetail(Details.REDIRECT_URI)
+                .removeDetail(Details.CONSENT)
+                .assertEvent();
+    }
+
+    @Test
+    public void loginResourceOwnerPassword() throws Exception {
+        X509AuthenticatorConfigModel config =
+                new X509AuthenticatorConfigModel()
+                        .setMappingSourceType(SUBJECTDN_EMAIL)
+                        .setUserIdentityMapperType(USERNAME_EMAIL);
+        AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", config.getConfig());
+        String cfgId = createConfig(directGrantExecution.getId(), cfg);
+        Assert.assertNotNull(cfgId);
+
+        doResourceOwnerPasswordLogin("resource-owner", "secret", "test-user@localhost", "");
     }
 
     private void setUserEnabled(String userName, boolean enabled) {
@@ -498,137 +868,33 @@ public class X509CertLoginTest  extends TestRealmKeycloakTest {
         updateUser(user);
     }
 
-    static class X509AuthenticatorConfigBuilder {
-        LinkedHashMap<String,String> parameters;
+    private X509AuthenticatorConfigModel createLoginSubjectEmail2UsernameOrEmailConfig() {
+        return new X509AuthenticatorConfigModel()
+                .setConfirmationPageAllowed(true)
+                .setMappingSourceType(SUBJECTDN_EMAIL)
+                .setUserIdentityMapperType(USERNAME_EMAIL);
+    }
 
-        public X509AuthenticatorConfigBuilder() {
-            parameters = new LinkedHashMap<>();
-        }
+    private X509AuthenticatorConfigModel createLoginSubjectCN2UsernameOrEmailConfig() {
+        return new X509AuthenticatorConfigModel()
+                .setConfirmationPageAllowed(true)
+                .setMappingSourceType(SUBJECTDN_CN)
+                .setUserIdentityMapperType(USERNAME_EMAIL);
+    }
 
-        public static X509AuthenticatorConfigBuilder defaultLoginSubjectEmail() {
-            X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-            return builder
-                    .cRLDPEnabled(false)
-                    .cRLEnabled(false)
-                    .oCSPEnabled(false)
-                    .setSubjectDNEmailAsUserIdentitySource()
-                    .setUsernameOrEmailUserIdentityMapper();
-        }
+    private X509AuthenticatorConfigModel createLoginIssuerCNToUsernameOrEmailConfig() {
+        return new X509AuthenticatorConfigModel()
+                .setConfirmationPageAllowed(true)
+                .setMappingSourceType(ISSUERDN_CN)
+                .setUserIdentityMapperType(USERNAME_EMAIL);
+    }
 
-        public static X509AuthenticatorConfigBuilder defaultLoginSubjectCN() {
-            X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-            return builder
-                    .cRLDPEnabled(false)
-                    .cRLEnabled(false)
-                    .oCSPEnabled(false)
-                    .setSubjectDNEmailAsUserIdentitySource()
-                    .setUsernameOrEmailUserIdentityMapper();
-        }
-
-        public static X509AuthenticatorConfigBuilder defaultLoginIssuerEmail() {
-            X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-            return builder
-                    .cRLDPEnabled(false)
-                    .cRLEnabled(false)
-                    .oCSPEnabled(false)
-                    .setIssuerDNEmailAsUserIdentitySource()
-                    .setCustomAttributeName("x509_certificate_identity")
-                    .setCustomAttributeUserIdentityMapper();
-        }
-
-        public static X509AuthenticatorConfigBuilder defaultLoginIssuerCN() {
-            X509AuthenticatorConfigBuilder builder = new X509AuthenticatorConfigBuilder();
-            return builder
-                    .cRLDPEnabled(false)
-                    .cRLEnabled(false)
-                    .oCSPEnabled(false)
-                    .setIssuerDNCNAsUserIdentitySource()
-                    .setCustomAttributeName("x509_certificate_identity")
-                    .setCustomAttributeUserIdentityMapper();
-        }
-
-        public X509AuthenticatorConfigBuilder regularExpression(String pattern) {
-            parameters.put(REGULAR_EXPRESSION, pattern);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder cRLEnabled(boolean enabled) {
-            parameters.put(ENABLE_CRL, enabled ? "true" : "false");
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder oCSPEnabled(boolean enabled) {
-            parameters.put(ENABLE_OCSP, enabled ? "true" : "false");
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder cRLDPEnabled(boolean enabled) {
-            parameters.put(ENABLE_CRLDP, enabled ? "true" : "false");
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder cRLFilePath(String filePath) {
-            parameters.put(CRL_RELATIVE_PATH, filePath);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder oCSPResponderURI(String responderURI) {
-            parameters.put(OCSPRESPONDER_URI, responderURI);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setIdentitySourceFromSubjectDNRegularExpression() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_SUBJECTDN);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setIdentitySourceFromIssuerDNRegularExpression() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_ISSUERDN);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setSubjectDNEmailAsUserIdentitySource() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_SUBJECTDN_EMAIL);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setSubjectDNCNAsUserIdentitySource() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_SUBJECTDN_CN);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setIssuerDNEmailAsUserIdentitySource() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_ISSUERDN_EMAIL);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setIssuerDNCNAsUserIdentitySource() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_ISSUERDN_CN);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setSerialNumberAsUserIdentitySource() {
-            parameters.put(MAPPING_SOURCE_SELECTION, MAPPING_SOURCE_CERT_SERIALNUMBER);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setUsernameOrEmailUserIdentityMapper() {
-            parameters.put(USER_MAPPER_SELECTION, USERNAME_EMAIL_MAPPER);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setCustomAttributeUserIdentityMapper() {
-            parameters.put(USER_MAPPER_SELECTION, USER_ATTRIBUTE_MAPPER);
-            return this;
-        }
-
-        public X509AuthenticatorConfigBuilder setCustomAttributeName(String userAttribute) {
-            parameters.put(CUSTOM_ATTRIBUTE_NAME, userAttribute);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setKeyUsage(String keyUsage) {
-            parameters.put(CERTIFICATE_KEY_USAGE, keyUsage);
-            return this;
-        }
-        public X509AuthenticatorConfigBuilder setExtendedKeyUsage(String extendedKeyUsage) {
-            parameters.put(CERTIFICATE_EXTENDED_KEY_USAGE, extendedKeyUsage);
-            return this;
-        }
-
-        public Map<String,String> build() {
-            return parameters;
-        }
+    private X509AuthenticatorConfigModel createLoginIssuerDN_OU2CustomAttributeConfig() {
+        return new X509AuthenticatorConfigModel()
+                .setConfirmationPageAllowed(true)
+                .setMappingSourceType(ISSUERDN)
+                .setRegularExpression("OU=(.*?)(?:,|$)")
+                .setUserIdentityMapperType(USER_ATTRIBUTE)
+                .setCustomAttributeName("x509_certificate_identity");
     }
 }
