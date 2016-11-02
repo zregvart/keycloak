@@ -33,6 +33,7 @@ import org.keycloak.testsuite.util.OAuthClient;
 
 import javax.ws.rs.core.Response;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USERNAME_EMAIL;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USER_ATTRIBUTE;
@@ -48,7 +49,7 @@ import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorC
 public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
 
     @Test
-    public void loginResourceOwnerPasswordFailedOnDuplicateUsers() throws Exception {
+    public void loginFailedOnDuplicateUsers() throws Exception {
 
         AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginIssuerDN_OU2CustomAttributeConfig().getConfig());
         String cfgId = createConfig(directGrantExecution.getId(), cfg);
@@ -60,27 +61,27 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
         UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
         Assert.assertNotNull(user);
 
-        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
 
         user = testRealm().users().get(userId).toRepresentation();
         Assert.assertNotNull(user);
 
-        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
+
+        events.clear();
 
         oauth.clientId("resource-owner");
         OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
 
         assertEquals(401, response.getStatusCode());
         assertEquals("invalid_request", response.getError());
-
-        String errorDesc = "X509 certificate authentication's failed.";
-        assertEquals(errorDesc, response.getErrorDescription().substring(0, errorDesc.length()));
+        Assert.assertThat(response.getErrorDescription(), containsString("X509 certificate authentication's failed."));
     }
 
     @Test
-    public void loginResourceOwnerPasswordFailedOnInvalidUser() throws Exception {
+    public void loginFailedOnInvalidUser() throws Exception {
 
         AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginIssuerDN_OU2CustomAttributeConfig().getConfig());
         String cfgId = createConfig(directGrantExecution.getId(), cfg);
@@ -91,6 +92,8 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
 
         user.singleAttribute("x509_certificate_identity", "-");
         this.updateUser(user);
+
+        events.clear();
 
         oauth.clientId("resource-owner");
         OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
@@ -112,7 +115,7 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
     }
 
     @Test
-    public void loginResourceOwnerPasswordFailedDisabledUser() throws Exception {
+    public void loginFailedDisabledUser() throws Exception {
         setUserEnabled("test-user@localhost", false);
 
         try {
@@ -143,7 +146,7 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
         }
     }
 
-    private void loginResourceOwnerCredentialsForceTemporaryAccountLock() throws Exception {
+    private void loginForceTemporaryAccountLock() throws Exception {
         X509AuthenticatorConfigModel config = new X509AuthenticatorConfigModel()
                 .setMappingSourceType(ISSUERDN)
                 .setRegularExpression("OU=(.*?)(?:,|$)")
@@ -160,6 +163,8 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
         user.singleAttribute("x509_certificate_identity", "-");
         this.updateUser(user);
 
+        events.clear();
+
         oauth.clientId("resource-owner");
         OAuthClient.AccessTokenResponse response;
         response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
@@ -172,9 +177,9 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
 
     @Test
     @Ignore
-    public void loginResourceOwnerPasswordFailedTemporarilyDisabledUser() throws Exception {
+    public void loginFailedTemporarilyDisabledUser() throws Exception {
 
-        loginResourceOwnerCredentialsForceTemporaryAccountLock();
+        loginForceTemporaryAccountLock();
 
         AuthenticatorConfigRepresentation cfg = newConfig("x509-directgrant-config", createLoginSubjectEmail2UsernameOrEmailConfig().getConfig());
         String cfgId = createConfig(directGrantExecution.getId(), cfg);
@@ -199,7 +204,7 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
     }
 
 
-    private void doResourceOwnerPasswordLogin(String clientId, String clientSecret, String login, String password) throws Exception {
+    private void doResourceOwnerCredentialsLogin(String clientId, String clientSecret, String login, String password) throws Exception {
 
         oauth.clientId(clientId);
         OAuthClient.AccessTokenResponse response = oauth.doGrantAccessTokenRequest(clientSecret, "", "", null);
@@ -224,7 +229,7 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
     }
 
     @Test
-    public void loginResourceOwnerPassword() throws Exception {
+    public void loginResourceOwnerCredentialsSuccess() throws Exception {
         X509AuthenticatorConfigModel config =
                 new X509AuthenticatorConfigModel()
                         .setMappingSourceType(SUBJECTDN_EMAIL)
@@ -233,6 +238,7 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
         String cfgId = createConfig(directGrantExecution.getId(), cfg);
         Assert.assertNotNull(cfgId);
 
-        doResourceOwnerPasswordLogin("resource-owner", "secret", "test-user@localhost", "");
+        doResourceOwnerCredentialsLogin("resource-owner", "secret", "test-user@localhost", "");
     }
+
 }

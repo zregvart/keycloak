@@ -78,16 +78,14 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
         catch(GeneralSecurityException e) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Exception: %s", e.getMessage());
             // TODO use specific locale to load error messages
-            String errorMessage = String.format("Certificate validation's failed. The reason: \"%s\"", e.getMessage());
-            Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", errorMessage);
+            Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", e.getMessage());
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
             return;
         }
         catch(Exception e) {
             logger.errorf("[ValidateX509CertificateUsername:authenticate] Exception: %s", e.getMessage());
             // TODO use specific locale to load error messages
-            String errorMessage = String.format("Certificate validation failed. The reason: \"%s\"", e.getMessage());
-            Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", errorMessage);
+            Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", e.getMessage());
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
             return;
         }

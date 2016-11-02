@@ -27,12 +27,12 @@ import org.keycloak.events.Details;
 import org.keycloak.representations.idm.AuthenticatorConfigRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.testsuite.pages.AppPage;
-import org.keycloak.testsuite.pages.ErrorPage;
 import org.keycloak.testsuite.pages.LoginPage;
 import org.keycloak.testsuite.pages.x509.X509IdentityConfirmationPage;
 
 import javax.ws.rs.core.Response;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USERNAME_EMAIL;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USER_ATTRIBUTE;
@@ -120,7 +120,7 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
 
     @Test
     public void loginAsUserFromCertIssuerCN() {
-        login(createLoginIssuerCNToUsernameOrEmailConfig(), userId2, "localhost", "localhost");
+        login(createLoginIssuerCNToUsernameOrEmailConfig(), userId2, "keycloak", "Keycloak");
     }
 
     @Test
@@ -129,10 +129,12 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
         Assert.assertNotNull(user);
 
-        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
 
-        login(createLoginIssuerDN_OU2CustomAttributeConfig(), userId2, "localhost", "Keycloak");
+        events.clear();
+
+        login(createLoginIssuerDN_OU2CustomAttributeConfig(), userId2, "keycloak", "Red Hat");
     }
 
     @Test
@@ -148,19 +150,20 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         UserRepresentation user = testRealm().users().get(userId2).toRepresentation();
         Assert.assertNotNull(user);
 
-        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
 
         user = testRealm().users().get(userId).toRepresentation();
         Assert.assertNotNull(user);
 
-        user.singleAttribute("x509_certificate_identity", "Keycloak");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
+
+        events.clear();
 
         loginPage.open();
 
-        String expectedMessage = "X509 certificate authentication's failed.";
-        Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+        Assert.assertThat(loginPage.getError(), containsString("X509 certificate authentication's failed."));
 
         loginPage.login("test-user@localhost", "password");
 
@@ -180,8 +183,7 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         loginConfirmationPage.open();
         loginPage.assertCurrent();
 
-        String expectedMessage = "X509 client authentication has not been configured yet";
-        Assert.assertEquals(expectedMessage, loginPage.getInfoMessage().substring(0, expectedMessage.length()));
+        Assert.assertThat(loginPage.getInfoMessage(), containsString("X509 client authentication has not been configured yet"));
         // Continue with form based login
         loginPage.login("test-user@localhost", "password");
 
@@ -213,13 +215,12 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         // Verify there is an error message
         Assert.assertNotNull(loginPage.getError());
 
-        String expectedMessage = "X509 certificate authentication's failed.";
-        Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+        Assert.assertThat(loginPage.getError(), containsString("X509 certificate authentication's failed."));
         events.expectLogin()
                 .user((String) null)
                 .session((String) null)
                 .error("user_not_found")
-                .detail(Details.USERNAME, "Widgets Inc.")
+                .detail(Details.USERNAME, "Red Hat")
                 .removeDetail(Details.CONSENT)
                 .removeDetail(Details.REDIRECT_URI)
                 .assertEvent();
@@ -253,8 +254,10 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         // extracted from the client certificate
         UserRepresentation user = findUser("test-user@localhost");
         Assert.assertNotNull(user);
-        user.singleAttribute("x509_certificate_identity", "Widgets Inc.");
+        user.singleAttribute("x509_certificate_identity", "Red Hat");
         this.updateUser(user);
+
+        events.clear();
 
         loginConfirmationPage.open();
 
@@ -290,8 +293,7 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         // Verify there is an error message
         Assert.assertNotNull(loginPage.getError());
 
-        String expectedMessage = "X509 certificate authentication's failed.";
-        Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+        Assert.assertThat(loginPage.getError(), containsString("X509 certificate authentication's failed."));
 
         events.expectLogin()
                 .user((String) null)
@@ -326,8 +328,7 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
 
             Assert.assertNotNull(loginPage.getError());
 
-            String expectedMessage = "X509 certificate authentication's failed.\nUser is disabled";
-            Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+            Assert.assertThat(loginPage.getError(), containsString("X509 certificate authentication's failed.\nUser is disabled"));
 
             events.expectLogin()
                     .user(userId)
@@ -392,8 +393,7 @@ public class X509BrowserLoginTest extends AbstractX509AuthenticationTest {
         // Verify there is an error message
         Assert.assertNotNull(loginPage.getError());
 
-        String expectedMessage = "Certificate validation's failed.\nCertificate has been revoked, certificate's subject:";
-        Assert.assertEquals(expectedMessage, loginPage.getError().substring(0, expectedMessage.length()));
+        Assert.assertThat(loginPage.getError(), containsString("Certificate validation's failed.\nCertificate has been revoked, certificate's subject:"));
 
         // Continue with form based login
         loginPage.login("test-user@localhost", "password");

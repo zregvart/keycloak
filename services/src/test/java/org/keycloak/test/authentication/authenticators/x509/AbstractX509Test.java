@@ -28,6 +28,7 @@ import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.ocsp.*;
 import org.bouncycastle.cert.ocsp.jcajce.JcaBasicOCSPRespBuilder;
 import org.bouncycastle.cert.ocsp.jcajce.JcaCertificateID;
+import org.bouncycastle.cert.ocsp.jcajce.JcaRespID;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.DigestCalculator;
 import org.bouncycastle.operator.DigestCalculatorProvider;
@@ -216,6 +217,31 @@ public abstract class AbstractX509Test {
     protected static X509CRL generateCRL() throws GeneralSecurityException, OperatorCreationException {
         return generateCRL(idpPair.getPrivate(), rootCertificate, clientCertificates[0]);
     }
+
+    protected static OCSPResponse generateCertificateCompromisedOCSPResponseIssuerPrincipalAsResponderId() throws OperatorCreationException, OCSPException, IOException, CertificateEncodingException {
+        DigestCalculator digestCalculator = createDigestCalculator();
+
+        BasicOCSPRespBuilder ocspRespBuilder = new BasicOCSPRespBuilder(new JcaRespID(rootCertificate.getSubjectX500Principal()));
+
+        BigInteger serialNumber = clientCertificates[0].getSerialNumber();
+        JcaCertificateID certificateID = new JcaCertificateID(digestCalculator, rootCertificate, serialNumber);
+
+        ocspRespBuilder.addResponse(certificateID, new RevokedStatus(new Date(), CRLReason.aACompromise));
+
+        ContentSigner contentSigner = CertificateUtils.createSigner(idpPair.getPrivate());
+
+        X509CertificateHolder[] chain = new X509CertificateHolder[] {
+                new X509CertificateHolder(clientCertificates[0].getEncoded()),
+                new X509CertificateHolder(clientCertificates[1].getEncoded())
+        };
+        BasicOCSPResp basicResp = ocspRespBuilder.build(contentSigner, chain, new Date());
+
+        OCSPResp ocsResp = new OCSPRespBuilder().build(OCSPRespBuilder.SUCCESSFUL, basicResp);
+        OCSPResponse ocspResponse = ocsResp.toASN1Structure();
+
+        return ocspResponse;
+    }
+
 
     protected static OCSPResponse generateCertificateCompromisedOCSPResponse() throws OperatorCreationException, OCSPException, IOException, CertificateEncodingException {
         DigestCalculator digestCalculator = createDigestCalculator();
