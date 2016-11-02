@@ -88,6 +88,7 @@
         <client.key.file>${auth.server.config.dir}/client.key</client.key.file>
         <client.key.passphrase>secret</client.key.passphrase>
 
+        <auth.server.ocsp.responder.enabled>false</auth.server.ocsp.responder.enabled>
     </properties>
 
     <build>
@@ -200,6 +201,7 @@
                             <client.key.file>${client.key.file}</client.key.file>
                             <client.key.passphrase>${client.key.passphrase}</client.key.passphrase>
 
+                            <auth.server.ocsp.responder.enabled>${auth.server.ocsp.responder.enabled}</auth.server.ocsp.responder.enabled>
                         </systemPropertyVariables>
                         <properties>
                             <property>

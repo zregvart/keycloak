@@ -56,7 +56,7 @@ import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorC
 public abstract class AbstractX509AuthenticationTest extends TestRealmKeycloakTest {
 
     public static final String EMPTY_CRL_PATH = "empty.crl";
-    public static final String CLIENT_CRL_PATH = "client.crl";
+    public static final String CLIENT_CRL_PATH = "intermediate-ca.crl";
     protected final Logger log = Logger.getLogger(this.getClass());
 
     static final String REQUIRED = "REQUIRED";
@@ -166,8 +166,8 @@ public abstract class AbstractX509AuthenticationTest extends TestRealmKeycloakTe
                 .build();
 
         UserRepresentation user = UserBuilder.create()
-                .id("localhost")
-                .username("localhost")
+                .id(KeycloakModelUtils.generateId())
+                .username("Keycloak")
                 .email("localhost@localhost")
                 .enabled(true)
                 .password("password")
@@ -302,7 +302,7 @@ public abstract class AbstractX509AuthenticationTest extends TestRealmKeycloakTe
         return new X509AuthenticatorConfigModel()
                 .setConfirmationPageAllowed(true)
                 .setMappingSourceType(ISSUERDN)
-                .setRegularExpression("OU=(.*?)(?:,|$)")
+                .setRegularExpression("O=(.*?)(?:,|$)")
                 .setUserIdentityMapperType(USER_ATTRIBUTE)
                 .setCustomAttributeName("x509_certificate_identity");
     }
