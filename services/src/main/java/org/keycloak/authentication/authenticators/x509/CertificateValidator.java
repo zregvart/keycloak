@@ -18,12 +18,9 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.DERIA5String;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.x509.*;
+import org.keycloak.common.util.CRLUtils;
+import org.keycloak.common.util.OCSPUtils;
 import org.keycloak.services.ServicesLogger;
-import sun.security.provider.certpath.OCSP;
 
 import javax.naming.Context;
 import javax.naming.NamingException;
@@ -31,13 +28,30 @@ import javax.naming.directory.Attribute;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.security.GeneralSecurityException;
-import java.security.cert.*;
-import java.util.*;
+import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509CRL;
+import java.security.cert.X509Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CRLException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Set;
+import java.util.LinkedList;
+import java.util.ArrayList;
+
 /**
  * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
  * @version $Revision: 1 $
@@ -47,8 +61,6 @@ import java.util.*;
 public class CertificateValidator {
 
     private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
-
-    private static final String CRL_DISTRIBUTION_POINTS_OID = "2.5.29.31";
 
     enum KeyUsageBits {
         DIGITAL_SIGNATURE(0, "digitalSignature"),
@@ -114,6 +126,17 @@ public class CertificateValidator {
         }
     }
 
+    public static abstract class OCSPChecker {
+        /**
+         * Requests certificate revocation status using OCSP. The OCSP responder URI
+         * is obtained from the certificate's AIA extension.
+         * @param cert the certificate to be checked
+         * @param issuerCertificate The issuer certificate
+         * @return revocation status
+         */
+        public abstract OCSPUtils.OCSPRevocationStatus check(X509Certificate cert, X509Certificate issuerCertificate) throws CertPathValidatorException;
+    }
+
     public static abstract class CRLLoaderImpl {
         /**
          * Returns a collection of {@link X509CRL}
@@ -121,6 +144,48 @@ public class CertificateValidator {
          * @throws GeneralSecurityException
          */
         public abstract Collection<X509CRL> getX509CRLs() throws GeneralSecurityException;
+    }
+
+    public static class BouncyCastleOCSPChecker extends OCSPChecker {
+
+        private final String responderUri;
+        BouncyCastleOCSPChecker(String responderUri) {
+            this.responderUri = responderUri;
+        }
+
+        @Override
+        public OCSPUtils.OCSPRevocationStatus check(X509Certificate cert, X509Certificate issuerCertificate) throws CertPathValidatorException {
+
+            OCSPUtils.OCSPRevocationStatus ocspRevocationStatus = null;
+            if (responderUri == null || responderUri.trim().length() == 0) {
+                // Obtains revocation status of a certificate using OCSP and assuming
+                // most common defaults. If responderUri is not specified,
+                // then OCS responder URI is retrieved from the
+                // certificate's AIA extension.
+                // OCSP responses must be signed with the issuer certificate
+                // or with another certificate that must be:
+                // 1) signed by the issuer certificate,
+                // 2) Includes the value of OCSPsigning in ExtendedKeyUsage v3 extension
+                // 3) Certificate is valid at the time
+                ocspRevocationStatus = OCSPUtils.check(cert, issuerCertificate);
+            }
+            else {
+                URI uri;
+                try {
+                    uri = new URI(responderUri);
+                } catch (URISyntaxException e) {
+                    String message = String.format("Unable to check certificate revocation status using OCSP.\n%s", e.getMessage());
+                    throw new CertPathValidatorException(message, e);
+                }
+                logger.debugf("Responder URI \"%s\" will be used to verify revocation status of the certificate using OCSP", uri.toString());
+                // Obtains the revocation status of a certificate using OCSP.
+                // OCSP responder's certificate is assumed to be the issuer's certificate
+                // certificate.
+                // responderUri overrides the contents (if any) of the certificate's AIA extension
+                ocspRevocationStatus = OCSPUtils.check(cert, issuerCertificate, uri, null, null);
+            }
+            return ocspRevocationStatus;
+        }
     }
 
     public static class CRLLoaderProxy extends CRLLoaderImpl {
@@ -263,7 +328,7 @@ public class CertificateValidator {
     boolean _crldpEnabled;
     CRLLoaderImpl _crlLoader;
     boolean _ocspEnabled;
-    String _responderUri;
+    OCSPChecker ocspChecker;
 
     public CertificateValidator() {
 
@@ -274,7 +339,7 @@ public class CertificateValidator {
                                    boolean cRLDPCheckingEnabled,
                                    CRLLoaderImpl crlLoader,
                                    boolean oCSPCheckingEnabled,
-                                   String oCSPResponderURI) {
+                                   OCSPChecker ocspChecker) {
         _certChain = certChain;
         _keyUsageBits = keyUsageBits;
         _extendedKeyUsage = extendedKeyUsage;
@@ -282,7 +347,10 @@ public class CertificateValidator {
         _crldpEnabled = cRLDPCheckingEnabled;
         _crlLoader = crlLoader;
         _ocspEnabled = oCSPCheckingEnabled;
-        _responderUri = oCSPResponderURI;
+        this.ocspChecker = ocspChecker;
+
+        if (ocspChecker == null)
+            throw new IllegalArgumentException("ocspChecker");
     }
 
     private static void validateKeyUsage(X509Certificate[] certs, int expected) throws GeneralSecurityException {
@@ -360,7 +428,7 @@ public class CertificateValidator {
         validateExtendedKeyUsage(_certChain, _extendedKeyUsage);
         return this;
     }
-    private static void checkRevocationUsingOCSP(X509Certificate[] certs, String responderUri) throws GeneralSecurityException {
+    private void checkRevocationUsingOCSP(X509Certificate[] certs) throws GeneralSecurityException {
 
         if (certs.length < 2) {
             // OCSP requires a responder certificate to verify OCSP
@@ -368,63 +436,30 @@ public class CertificateValidator {
             String message = "OCSP requires a responder certificate. OCSP cannot be used to verify the revocation status of self-signed certificates.";
             throw new GeneralSecurityException(message);
         }
-        try {
-            OCSP.RevocationStatus rs;
 
-            if (responderUri == null || responderUri.trim().length() == 0) {
-                // Obtains revocation status of a certificate using OCSP and assuming
-                // most common defaults. If responderUri is not specified,
-                // then OCS responder URI is retrieved from the
-                // certificate's AIA extension.  The OCSP responder certificate is assumed
-                // to be the issuer's certificate (or issued by the issuer CA).
-                rs = OCSP.check(certs[0], certs[1]);
-            }
-            else {
-                URI uri;
-                try {
-                    uri = new URI(responderUri);
-                } catch (URISyntaxException e) {
-                    String message = String.format("Unable to check certificate revocation status using OCSP.\n%s", e.getMessage());
-                    throw new GeneralSecurityException(message);
-                }
-                logger.debugf("Responder URI \"%s\" will be used to verify revocation status of the certificate using OCSP", uri.toString());
-                // Obtains the revocation status of a certificate using OCSP.
-                // OCSP responder's certificate is assumed to be the issuer's certificate
-                // certificate.
-                // responderUri overrides the contents (if any) of the certificate's AIA extension
-                rs = OCSP.check(certs[0], certs[1], uri, certs[1], null);
-            }
+        for (X509Certificate cert : certs) {
+            logger.infof("Certificate: %s", cert.getSubjectDN().getName());
+        }
 
-            if (rs == null) {
-                throw new GeneralSecurityException("Unable to check client revocation status using OCSP");
-            }
+        OCSPUtils.OCSPRevocationStatus rs = ocspChecker.check(certs[0], certs[1]);
 
-            if (rs.getCertStatus() == OCSP.RevocationStatus.CertStatus.UNKNOWN) {
-                throw new GeneralSecurityException("Unable to determine certificate's revocation status.");
-            }
-            else if (rs.getCertStatus() == OCSP.RevocationStatus.CertStatus.REVOKED) {
+        if (rs == null) {
+            throw new GeneralSecurityException("Unable to check client revocation status using OCSP");
+        }
 
-                StringBuilder sb = new StringBuilder();
-                sb.append("Certificate's been revoked.");
-                sb.append("\n");
-                sb.append(String.format("Revocation reason: %s", rs.getRevocationReason().name()));
-                sb.append("\n");
-                sb.append(String.format("Revoked on: %s",rs.getRevocationTime().toString()));
+        if (rs.getRevocationStatus() == OCSPUtils.RevocationStatus.UNKNOWN) {
+            throw new GeneralSecurityException("Unable to determine certificate's revocation status.");
+        }
+        else if (rs.getRevocationStatus() == OCSPUtils.RevocationStatus.REVOKED) {
 
-                throw new GeneralSecurityException(sb.toString());
-            }
-        } catch (IOException e) {
             StringBuilder sb = new StringBuilder();
-            sb.append(e.getMessage());
+            sb.append("Certificate's been revoked.");
+            sb.append("\n");
+            sb.append(rs.getRevocationReason().toString());
+            sb.append("\n");
+            sb.append(String.format("Revoked on: %s",rs.getRevocationTime().toString()));
 
-            StackTraceElement[] stackElements = e.getStackTrace();
-            for (StackTraceElement se : stackElements) {
-                sb.append("\n");
-                sb.append(se.toString());
-            }
-            logger.error(sb.toString());
-
-            throw new GeneralSecurityException(e.getMessage());
+            throw new GeneralSecurityException(sb.toString());
         }
     }
 
@@ -441,38 +476,14 @@ public class CertificateValidator {
             }
         }
     }
-    // See www.nakov.com/blog/2009/12/01/x509-certificate-validation-in-java-build-and-verify-cchain-and-verify-clr-with-bouncy-castle/
     private static List<String> getCRLDistributionPoints(X509Certificate cert) {
-        byte[] data = cert.getExtensionValue(CRL_DISTRIBUTION_POINTS_OID);
-        if (data == null)
-            return new ArrayList<>();
-
-        List<String> dps = new LinkedList<>();
-        ASN1InputStream is = new ASN1InputStream(new ByteArrayInputStream(data));
         try {
-            DEROctetString octetString = (DEROctetString)is.readObject();
-            byte[] octets = octetString.getOctets();
-
-            ASN1InputStream is2 = new ASN1InputStream(new ByteArrayInputStream(octets));
-            CRLDistPoint crlDP = CRLDistPoint.getInstance(is2.readObject());
-
-            for (DistributionPoint dp : crlDP.getDistributionPoints()) {
-                DistributionPointName dpn = dp.getDistributionPoint();
-                if (dpn != null && dpn.getType() == DistributionPointName.FULL_NAME) {
-                    GeneralName[] names = GeneralNames.getInstance(dpn.getName()).getNames();
-                    for (GeneralName gn : names) {
-                        if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
-                            String url = DERIA5String.getInstance(gn.getName()).getString();
-                            dps.add(url);
-                        }
-                    }
-                }
-            }
-        } catch (IOException | ClassCastException e) {
+            return CRLUtils.getCRLDistributionPoints(cert);
+        }
+        catch(IOException e) {
             logger.error(e.getMessage());
         }
-
-        return dps;
+        return new ArrayList<>();
     }
 
     private static void checkRevocationStatusUsingCRLDistributionPoints(X509Certificate[] certs) throws GeneralSecurityException {
@@ -499,7 +510,7 @@ public class CertificateValidator {
             }
         }
         if (_ocspEnabled) {
-            checkRevocationUsingOCSP(_certChain, _responderUri);
+            checkRevocationUsingOCSP(_certChain);
         }
         return this;
     }
@@ -689,7 +700,7 @@ public class CertificateValidator {
                  _crlLoader = new CRLFileLoader("");
             }
             return new CertificateValidator(certs, _keyUsageBits, _extendedKeyUsage,
-                    _crlCheckingEnabled, _crldpEnabled, _crlLoader, _ocspEnabled, _responderUri);
+                    _crlCheckingEnabled, _crldpEnabled, _crlLoader, _ocspEnabled, new BouncyCastleOCSPChecker(_responderUri));
         }
     }
 
