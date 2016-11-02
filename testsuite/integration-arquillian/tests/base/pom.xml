@@ -40,7 +40,8 @@
         <!--exclude cluster tests by default, enabled by 'auth-server-*-cluster' profiles in tests/pom.xml-->
         <exclude.cluster>**/cluster/**/*Test.java</exclude.cluster>
         <!-- exclude x509 tests by default, enabled by 'ssl' profile -->
-        <exclude.x509>**/forms/x509/*Test.java</exclude.x509>
+        <exclude.x509>**/forms/x509/*LoginTest.java,**/forms/x509/*GrantTest.java</exclude.x509>
+        <exclude.x509.ocsp>**/forms/x509/*OCSPResponderTest.java</exclude.x509.ocsp>
     </properties>
     
     <dependencies>
@@ -105,6 +106,7 @@
                         <exclude>${exclude.migration}</exclude>
                         <exclude>${exclude.cluster}</exclude>
                         <exclude>${exclude.x509}</exclude>
+                        <exclude>${exclude.x509.ocsp}</exclude>
                     </excludes>
                 </configuration>
             </plugin>

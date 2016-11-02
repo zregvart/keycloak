@@ -289,7 +289,7 @@
                                                 <include>ca.crt</include>
                                                 <include>client.crt</include>
                                                 <include>client.key</include>
-                                                <include>client.crl</include>
+                                                <include>intermediate-ca.crl</include>
                                                 <include>empty.crl</include>
                                             </includes>
                                         </resource>
@@ -391,6 +391,19 @@
         </profile>
 
         <profile>
+            <id>ocsp-responder</id>
+            <activation>
+                <property>
+                    <name>auth.server.ocsp.responder.enabled</name>
+                </property>
+            </activation>
+            <properties>
+                <!--disable exclusion pattern for x509 OCSP tests, which is enabled by default in the base/pom.xml-->
+                <exclude.x509.ocsp>-</exclude.x509.ocsp>
+            </properties>
+        </profile>
+
+        <profile>
             <id>ssl</id>
             <activation>
                 <property>
@@ -450,7 +463,7 @@
                                                     <include>ca.crt</include>
                                                     <include>client.crt</include>
                                                     <include>client.key</include>
-                                                    <include>client.crl</include>
+                                                    <include>intermediate-ca.crl</include>
                                                     <include>empty.crl</include>
                                                 </includes>
                                             </resource>

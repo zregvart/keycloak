@@ -502,9 +502,35 @@ public class CertificateValidatorTest extends AbstractX509Test {
             Assert.assertEquals(e.getMessage(), "OCSP requires a responder certificate. OCSP cannot be used to verify the revocation status of self-signed certificates.");
         }
     }
+    @Test
+    public void testOCSPWithResponderURIInAIA_IssuerPrincipalAsResponderId() throws GeneralSecurityException, NamingException, IOException, OperatorCreationException, OCSPException {
+        try {
+            OCSPResponse ocspResponse = generateCertificateCompromisedOCSPResponseIssuerPrincipalAsResponderId();
+            byte[] ocspResponseBytes = ocspResponse.getEncoded();
+
+            // setting behaviour for test case
+            mockServerClient.when(HttpRequest.request("/ocsp")).respond(HttpResponse.response().withBody(ocspResponseBytes).withStatusCode(200));
+
+            CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                    .revocation()
+                    .cRLEnabled(false)
+                    .cRLDPEnabled(false)
+                    .cRLrelativePath(null)
+                    .oCSPEnabled(true)
+                    .oCSPResponderURI(null)
+                    .build(clientCertificates);
+
+            validator.checkRevocationStatus();
+            Assert.fail("OCSP revocation check should have raised an exception.");
+        }
+        catch(GeneralSecurityException e) {
+            String testMessage = "Certificate's been revoked.\nCRLReason: aACompromise";
+            Assert.assertEquals(testMessage, e.getMessage().substring(0, testMessage.length()));
+        }
+    }
 
     @Test
-    public void testOCSPResponderURI() throws GeneralSecurityException, NamingException, IOException, OperatorCreationException, OCSPException {
+    public void testOCSPWithResponderURIInAIA() throws GeneralSecurityException, NamingException, IOException, OperatorCreationException, OCSPException {
         try {
             OCSPResponse ocspResponse = generateCertificateCompromisedOCSPResponse();
             byte[] ocspResponseBytes = ocspResponse.getEncoded();
@@ -525,7 +551,34 @@ public class CertificateValidatorTest extends AbstractX509Test {
             Assert.fail("OCSP revocation check should have raised an exception.");
         }
         catch(GeneralSecurityException e) {
-            Assert.assertTrue(e.getMessage().startsWith("Certificate's been revoked.\nRevocation reason: AA_COMPROMISE"));
+            String testMessage = "Certificate's been revoked.\nCRLReason: aACompromise";
+            Assert.assertEquals(testMessage, e.getMessage().substring(0, testMessage.length()));
+        }
+    }
+    @Test
+    public void testOCSPWithManuallySpecifiedResponderURI() throws GeneralSecurityException, NamingException, IOException, OperatorCreationException, OCSPException {
+        try {
+            OCSPResponse ocspResponse = generateCertificateCompromisedOCSPResponse();
+            byte[] ocspResponseBytes = ocspResponse.getEncoded();
+
+            // setting behaviour for test case
+            mockServerClient.when(HttpRequest.request("/ocsp")).respond(HttpResponse.response().withBody(ocspResponseBytes).withStatusCode(200));
+
+            CertificateValidator validator = new CertificateValidator.CertificateValidatorBuilder()
+                    .revocation()
+                    .cRLEnabled(false)
+                    .cRLDPEnabled(false)
+                    .cRLrelativePath(null)
+                    .oCSPEnabled(true)
+                    .oCSPResponderURI(ocspResponderUri.toString())
+                    .build(clientCertificates);
+
+            validator.checkRevocationStatus();
+            Assert.fail("OCSP revocation check should have raised an exception.");
+        }
+        catch(GeneralSecurityException e) {
+            String testMessage = "Certificate's been revoked.\nCRLReason: aACompromise";
+            Assert.assertEquals(testMessage, e.getMessage().substring(0, testMessage.length()));
         }
     }
 

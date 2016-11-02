@@ -11,7 +11,7 @@ The implementation supports Browser and Direct Grant Flows.
 
 ## Features
 
- - Supported identity mapping strategies:
+ - The following are the supported certificate identity extraction strategies:
    - Match SubjectDN using regular expression
    - X500 Subject's e-mail attribute
    - X500 Subject's Common Name attribute
@@ -19,7 +19,7 @@ The implementation supports Browser and Direct Grant Flows.
    - X500 Issuer's e-mail attribute
    - X500 Issuer's Common Name attribute
    - Certificate Serial Number
- - Supported User Identity/User mappings:
+ - User Identity/User mappings:
     - User identity to Username or E-mail
     - User identity to User Custom Attribute
  - Revocation status checking using CLR
@@ -146,8 +146,52 @@ $ curl https://[host][:port]/auth/realms/master/protocol/openid-connect/token --
 * [client_cert].key is private key in PEM format
 
 ## Running the X509 integration tests
-
-``` 
+X509 requires SSL/TSL protocol, so by default X509 integration tests are excluded. To verify X509 authentication functionality, you will need to run the integration test suite with TLS/SSL enabled.
+```
 $ mvn clean install -f testsuite/integration-arquillian/pom.xml -Pauth-server-wildfly -Dauth.server.ssl.required -Dtest=*X509*
+```
+### Debugging x509 integration tests: TLS/SSL diagnostics 
+To enable SSL/TLS diagnostics when running X509 authentication tests, enable the built-in debug facility activated by defining javax.net.debug System property:
+```
+mvn clean install -f testsuite/integration-arquillian/pom.xml -Pauth-server-wildfly -Dauth.server.ssl.required -Dtest=*X509* -Djavax.net.debug=ssl:handshake
+```
+
+## Running X509 integration tests against an OCSP server
+X509 authentication allows certificate revocation status checking using an OCSP server.
+To run the OCSP integration tests, you will need to manually start an OCSP server.
+Below is an example how to run the OCSP integration tests using the openssl tool
+and a simple OCSP server.
+
+- Open a terminal window and change the current directory to
+```
+testsuite/integration-arquillian/servers/auth-server/jboss/common/keystore/
+```
+- Start a simple OCSP server using 'openssl ocsp' command:
+```
+openssl ocsp -port 127.0.0.1:8888 -text -sha256 \
+    -index ocsp/index.txt \
+    -CA ocsp/certs/ca-chain.crt \
+    -rkey ocsp/private/intermediate-ca.key \
+    -rsigner ocsp/certs/intermediate-ca.crt -nrequest 2
+```
+- Open another terminal, change the current directory to the directory above, and send an OCSP request to the OCSP server:
+```
+openssl ocsp -CAfile ocsp/certs/ca-chain.crt \
+    -url http://127.0.0.1:8888 -resp_text \
+    -issuer ocsp/certs/intermediate-ca.crt \
+    -cert client.crt
+```
+- The output should like the following:
+```
+OCSP Response Data:
+    OCSP Response Status: successful (0x0)
+    Response Type: Basic OCSP Response
+    Version: 1 (0x0)
+    Responder Id: C = US, ST = MA, L = Boston, O = Red Hat, OU = Keycloak, CN = Keycloak
+...
+```
+- Run the OCSP x509 integration tests as follows:
+```
+mvn clean install -f testsuite/integration-arquillian/pom.xml -Pauth-server-wildfly -Dauth.server.ssl.required -Dtest=*OCSPResponderTest*
 ```
 
