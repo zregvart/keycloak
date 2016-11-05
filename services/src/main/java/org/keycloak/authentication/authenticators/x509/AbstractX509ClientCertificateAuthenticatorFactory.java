@@ -148,7 +148,7 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         identityConfirmationPageDisallowed.setType(BOOLEAN_TYPE);
         identityConfirmationPageDisallowed.setName(CONFIRMATION_PAGE_DISALLOWED);
         identityConfirmationPageDisallowed.setLabel("Bypass identity confirmation");
-        identityConfirmationPageDisallowed.setHelpText("By default, the user will prompted to confirm his/here identity extracted from X509 client certificate. The option allows to bypass the identity confirmation.");
+        identityConfirmationPageDisallowed.setHelpText("By default, the users are prompted to confirm their identity extracted from X509 client certificate. The identity confirmation prompt is skipped if the option is switched on.");
 
         configProperties = asList(mappingMethodList,
                 regExp,
