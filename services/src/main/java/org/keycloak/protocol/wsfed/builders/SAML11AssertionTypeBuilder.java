@@ -101,18 +101,18 @@ public class SAML11AssertionTypeBuilder {
         return this;
     }
 
-    protected SAML11AttributeType getNameAttribute(String nameId) {
-        SAML11AttributeType nameAttribute = new SAML11AttributeType("name", URI.create(ATTRIBUTE_NAMESPACE));
-        nameAttribute.add(nameId);
-        return nameAttribute;
-    }
-
-    protected SAML11SubjectType getSubjectType() {
+    protected SAML11SubjectType getSubjectType(String nameID, String nameIDFormat) {
         SAML11SubjectConfirmationType subjectConfirmationType = new SAML11SubjectConfirmationType();
         subjectConfirmationType.addConfirmationMethod(URI.create("urn:oasis:names:tc:SAML:1.0:cm:bearer"));
 
         SAML11SubjectType subject = new SAML11SubjectType();
         subject.setSubjectConfirmation(subjectConfirmationType);
+
+        SAML11NameIdentifierType nameIdentifierType = new SAML11NameIdentifierType(nameID);
+        nameIdentifierType.setFormat(URI.create(nameIDFormat));
+
+        SAML11SubjectType.SAML11SubjectTypeChoice subjectTypeChoice = new SAML11SubjectType.SAML11SubjectTypeChoice(nameIdentifierType);
+        subject.setChoice(subjectTypeChoice);
 
         return subject;
     }
@@ -151,11 +151,11 @@ public class SAML11AssertionTypeBuilder {
         conditions.add(audience);
         assertion.setConditions(conditions);
 
-        SAML11SubjectType subject = getSubjectType();
+        SAML11SubjectType subject = getSubjectType(nameId, nameIdFormat);
 
         SAML11AttributeStatementType attributeStatement = new SAML11AttributeStatementType();
         attributeStatement.setSubject(subject);
-        attributeStatement.add(getNameAttribute(nameId));
+//        attributeStatement.add(getNameAttribute(nameId));
         assertion.add(attributeStatement);
 
         SAML11AuthenticationStatementType authnStatement = getAuthenticationStatement(subject, assertion.getIssueInstant());

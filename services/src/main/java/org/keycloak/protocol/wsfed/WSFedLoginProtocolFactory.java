@@ -16,21 +16,25 @@
 
 package org.keycloak.protocol.wsfed;
 
-import org.keycloak.models.*;
-import org.keycloak.protocol.wsfed.mappers.OIDCFullNameMapper;
-import org.keycloak.protocol.wsfed.mappers.OIDCUserPropertyMapper;
-import org.keycloak.protocol.wsfed.mappers.SAMLRoleListMapper;
-import org.keycloak.protocol.wsfed.mappers.SAMLUserPropertyAttributeStatementMapper;
 import org.keycloak.events.EventBuilder;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientTemplateModel;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.AbstractLoginProtocolFactory;
 import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.oidc.mappers.AddressMapper;
 import org.keycloak.protocol.saml.mappers.AttributeStatementHelper;
+import org.keycloak.protocol.wsfed.mappers.OIDCFullNameMapper;
+import org.keycloak.protocol.wsfed.mappers.OIDCUserPropertyMapper;
+import org.keycloak.protocol.wsfed.mappers.SAMLRoleListMapper;
+import org.keycloak.protocol.wsfed.mappers.SAMLUserFullNameAttributeStatementMapper;
+import org.keycloak.protocol.wsfed.mappers.SAMLUserPropertyAttributeStatementMapper;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientTemplateRepresentation;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.saml.processing.core.saml.v2.constants.X500SAMLProfileConstants;
-import org.keycloak.services.managers.AuthenticationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -153,6 +157,13 @@ public class WSFedLoginProtocolFactory extends AbstractLoginProtocolFactory {
                 X500SAMLProfileConstants.EMAIL.getFriendlyName(),
                 true, "${email}");
         builtins.add(model);
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper("X500 emailAddress",
+                "emailAddress",
+                X500SAMLProfileConstants.EMAIL_ADDRESS.get(),
+                JBossSAMLURIConstants.ATTRIBUTE_FORMAT_URI.get(),
+                X500SAMLProfileConstants.EMAIL_ADDRESS.getFriendlyName(),
+                true, "${email}");
+        builtins.add(model);
         model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper("X500 givenName",
                 "firstName",
                 X500SAMLProfileConstants.GIVEN_NAME.get(),
@@ -167,6 +178,48 @@ public class WSFedLoginProtocolFactory extends AbstractLoginProtocolFactory {
                 X500SAMLProfileConstants.SURNAME.getFriendlyName(),
                 true, "${familyName}");
         builtins.add(model);
+
+        // SAML 1.1
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper(JBossSAMLURIConstants.CLAIMS_NAME.get(),
+                "username",
+                JBossSAMLURIConstants.CLAIMS_NAME.get(),
+                JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get(),
+                "name",
+                false, FULL_NAME_CONSENT_TEXT);
+        builtins.add(model);
+        defaultBuiltins.add(model);
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper(JBossSAMLURIConstants.CLAIMS_EMAIL_ADDRESS_2005.get(),
+                "email",
+                JBossSAMLURIConstants.CLAIMS_EMAIL_ADDRESS_2005.get(),
+                JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get(),
+                "emailaddress",
+                false, "${email}");
+        builtins.add(model);
+        defaultBuiltins.add(model);
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper(JBossSAMLURIConstants.CLAIMS_NAME_IDENTIFIER.get(),
+                "username",
+                JBossSAMLURIConstants.CLAIMS_NAME_IDENTIFIER.get(),
+                JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get(),
+                "nameidentifier",
+                false, "${username}");
+        builtins.add(model);
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper(JBossSAMLURIConstants.CLAIMS_GIVEN_NAME.get(),
+                "firstName",
+                JBossSAMLURIConstants.CLAIMS_GIVEN_NAME.get(),
+                JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get(),
+                "givenname",
+                false, "${givenName}");
+        builtins.add(model);
+        defaultBuiltins.add(model);
+        model = SAMLUserPropertyAttributeStatementMapper.createAttributeMapper(JBossSAMLURIConstants.CLAIMS_SURNAME.get(),
+                "lastName",
+                JBossSAMLURIConstants.CLAIMS_SURNAME.get(),
+                JBossSAMLURIConstants.NAMEID_FORMAT_UNSPECIFIED.get(),
+                "surname",
+                false, "${familyName}");
+        builtins.add(model);
+        defaultBuiltins.add(model);
+
         model = SAMLRoleListMapper.create("saml role list", "Role", AttributeStatementHelper.BASIC, null, false);
         builtins.add(model);
         defaultBuiltins.add(model);

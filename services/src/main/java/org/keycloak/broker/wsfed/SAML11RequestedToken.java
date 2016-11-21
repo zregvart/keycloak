@@ -19,42 +19,38 @@
 package org.keycloak.broker.wsfed;
 
 import org.jboss.logging.Logger;
-import org.keycloak.dom.saml.v1.assertion.*;
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
+import org.keycloak.dom.saml.v1.assertion.SAML11AttributeStatementType;
+import org.keycloak.dom.saml.v1.assertion.SAML11AttributeType;
+import org.keycloak.dom.saml.v1.assertion.SAML11AudienceRestrictionCondition;
+import org.keycloak.dom.saml.v1.assertion.SAML11ConditionAbstractType;
+import org.keycloak.dom.saml.v1.assertion.SAML11ConditionsType;
+import org.keycloak.dom.saml.v1.assertion.SAML11StatementAbstractType;
+import org.keycloak.dom.saml.v1.assertion.SAML11SubjectType;
 import org.keycloak.events.Errors;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.events.EventType;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.protocol.wsfed.sig.SAML11Signature;
+import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.saml.common.exceptions.ConfigurationException;
 import org.keycloak.saml.common.exceptions.ParsingException;
 import org.keycloak.saml.common.exceptions.ProcessingException;
 import org.keycloak.saml.common.util.DocumentUtil;
-import org.keycloak.saml.processing.core.parsers.saml.SAML11AssertionParser;
 import org.keycloak.saml.processing.core.parsers.saml.SAMLParser;
-import org.keycloak.saml.processing.core.parsers.util.SAML11ParserUtil;
-import org.keycloak.saml.processing.core.saml.v2.constants.X500SAMLProfileConstants;
 import org.keycloak.saml.processing.core.saml.v2.util.AssertionUtil;
-import org.keycloak.saml.processing.core.util.JAXPValidationUtil;
 import org.keycloak.services.ErrorPage;
 import org.keycloak.services.messages.Messages;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
 
 import javax.ws.rs.core.Response;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.*;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.StringReader;
 import java.net.URI;
 import java.security.PublicKey;
 import java.util.List;
@@ -137,15 +133,55 @@ public class SAML11RequestedToken implements RequestedToken  {
     }
 
     @Override
-    public String getUsername() {
+    public String getFirstName() {
         if (!samlAssertion.getStatements().isEmpty()) {
             for (SAML11StatementAbstractType st : samlAssertion.getStatements()) {
                 if (st instanceof  SAML11AttributeStatementType) {
                     SAML11AttributeStatementType attributeStatement = (SAML11AttributeStatementType)st;
                     for (SAML11AttributeType attribute : attributeStatement.get()) {
-                        if (X500SAMLProfileConstants.NAME.getFriendlyName().equals(attribute.getAttributeName())
-                                || X500SAMLProfileConstants.NAME.get().equals(attribute.getAttributeName())
-                                || "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name".equals(attribute.getAttributeName())) {
+                        if ("givenname".equals(attribute.getAttributeName())
+                                || JBossSAMLURIConstants.CLAIMS_GIVEN_NAME.get().equalsIgnoreCase(attribute.getAttributeName())) {
+                            if (!attribute.get().isEmpty()) {
+                                return attribute.get().get(0).toString();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public String getLastName() {
+        if (!samlAssertion.getStatements().isEmpty()) {
+            for (SAML11StatementAbstractType st : samlAssertion.getStatements()) {
+                if (st instanceof  SAML11AttributeStatementType) {
+                    SAML11AttributeStatementType attributeStatement = (SAML11AttributeStatementType)st;
+                    for (SAML11AttributeType attribute : attributeStatement.get()) {
+                        if ("surname".equals(attribute.getAttributeName())
+                                || JBossSAMLURIConstants.CLAIMS_SURNAME.get().equalsIgnoreCase(attribute.getAttributeName())) {
+                            if (!attribute.get().isEmpty()) {
+                                return attribute.get().get(0).toString();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public String getUsername() {
+        if (!samlAssertion.getStatements().isEmpty()) {
+            for (SAML11StatementAbstractType st : samlAssertion.getStatements()) {
+                if (st instanceof  SAML11AttributeStatementType) {
+                    SAML11AttributeStatementType attributeStatement = (SAML11AttributeStatementType)st;
+                    // The "name" claim is a username
+                    for (SAML11AttributeType attribute : attributeStatement.get()) {
+                        if ("name".equalsIgnoreCase(attribute.getAttributeName())
+                            || JBossSAMLURIConstants.CLAIMS_NAME.get().equalsIgnoreCase(attribute.getAttributeName())) {
                             if (!attribute.get().isEmpty()) {
                                 return attribute.get().get(0).toString();
                             }
@@ -164,9 +200,8 @@ public class SAML11RequestedToken implements RequestedToken  {
                 if (st instanceof  SAML11AttributeStatementType) {
                     SAML11AttributeStatementType attributeStatement = (SAML11AttributeStatementType)st;
                     for (SAML11AttributeType attribute : attributeStatement.get()) {
-                        if (X500SAMLProfileConstants.EMAIL.getFriendlyName().equals(attribute.getAttributeName())
-                                || X500SAMLProfileConstants.EMAIL.get().equals(attribute.getAttributeName())
-                                || "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress".equals(attribute.getAttributeName())) {
+                        if ("emailaddress".equalsIgnoreCase(attribute.getAttributeName())
+                                || JBossSAMLURIConstants.CLAIMS_EMAIL_ADDRESS_2005.get().equals(attribute.getAttributeName())) {
                             if (!attribute.get().isEmpty()) {
                                 return attribute.get().get(0).toString();
                             }
@@ -180,6 +215,34 @@ public class SAML11RequestedToken implements RequestedToken  {
 
     @Override
     public String getId() {
+        if (!samlAssertion.getStatements().isEmpty()) {
+            for (SAML11StatementAbstractType st : samlAssertion.getStatements()) {
+                if (st instanceof  SAML11AttributeStatementType) {
+                    SAML11AttributeStatementType attributeStatement = (SAML11AttributeStatementType)st;
+                    // First check if the nameIdentifier of the Subject is available
+                    // Can the subject be false? What does the spec say?
+                    SAML11SubjectType subject = attributeStatement.getSubject();
+                    if (subject != null && subject.getChoice() != null)  {
+                        SAML11SubjectType.SAML11SubjectTypeChoice choice = subject.getChoice();
+                        if (choice.getNameID() != null) {
+                            String nameId = choice.getNameID().getValue();
+                            if (nameId != null && nameId.length() > 0) {
+                                return nameId;
+                            }
+                        }
+                    }
+                    // The "nameidentifier" is a unique user id.
+                    for (SAML11AttributeType attribute : attributeStatement.get()) {
+                        if ("nameidenfier".equalsIgnoreCase(attribute.getAttributeName())
+                                || JBossSAMLURIConstants.CLAIMS_NAME_IDENTIFIER.get().equalsIgnoreCase(attribute.getAttributeName())) {
+                            if (!attribute.get().isEmpty()) {
+                                return attribute.get().get(0).toString();
+                            }
+                        }
+                    }
+                }
+            }
+        }
         return getUsername();
     }
 

@@ -46,6 +46,10 @@ public interface RequestedToken {
 
     String getSessionIndex();
 
+    String getFirstName();
+
+    String getLastName();
+
     default Document createXmlDocument(String response) throws ProcessingException, ParserConfigurationException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);

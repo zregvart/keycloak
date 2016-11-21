@@ -241,8 +241,19 @@ public class WSFedEndpoint {
 
             identity.setUsername(token.getUsername());
 
-            if (token.getEmail() != null) {
-                identity.setEmail(token.getEmail());
+            String email;
+            if ((email = token.getEmail()) != null) {
+                identity.setEmail(email);
+            }
+
+            String givenName;
+            if ((givenName = token.getFirstName()) != null) {
+                identity.setFirstName(givenName);
+            }
+
+            String surName;
+            if ((surName = token.getLastName()) != null) {
+                identity.setLastName(surName);
             }
 
             if (config.isStoreToken()) {

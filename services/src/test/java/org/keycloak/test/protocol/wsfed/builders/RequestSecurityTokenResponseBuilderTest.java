@@ -16,9 +16,12 @@
 
 package org.keycloak.test.protocol.wsfed.builders;
 
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
 import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
 import org.keycloak.protocol.wsfed.builders.WSFedOIDCAccessTokenBuilder;
 import org.keycloak.protocol.wsfed.builders.WSFedSAML2AssertionTypeBuilder;
+import org.keycloak.protocol.wsfed.builders.WsFedSAML11AssertionTypeBuilder;
+import org.keycloak.saml.processing.core.saml.v1.SAML11Constants;
 import org.keycloak.test.common.MockHelper;
 import org.keycloak.test.common.TestHelpers;
 import org.keycloak.wsfed.common.WSFedConstants;
@@ -49,6 +52,8 @@ import static org.keycloak.test.common.TestHelpers.*;
 
 /**
  * Created by dbarentine on 8/21/2015.
+ * @author dbarentine
+ * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
  */
 public class RequestSecurityTokenResponseBuilderTest {
 
@@ -117,6 +122,53 @@ public class RequestSecurityTokenResponseBuilderTest {
 
         assertEquals(builder.getRequestIssuer(), ((EndpointReferenceType) rstr.getAppliesTo().getAny().get(0)).getAddress().getValue());
         assertEquals(URI.create("http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0"), rstr.getTokenType());
+
+        assertThat(rstr.getRequestedSecurityToken().getAny().get(0), instanceOf(Element.class));
+        Element element = (Element)rstr.getRequestedSecurityToken().getAny().get(0);
+        assertTrue(AssertionUtil.isSignatureValid(element, mockHelper.getRealm().getPublicKey()));
+    }
+
+    @Test
+    public void testSaml11TokenGeneration() throws Exception {
+        MockHelper mockHelper = TestHelpers.getMockHelper();
+
+        mockHelper.getClientAttributes().put(WSFedSAML2AssertionTypeBuilder.SAML_FORCE_NAME_ID_FORMAT_ATTRIBUTE, "false");
+        mockHelper.getClientSessionNotes().put(GeneralConstants.NAMEID_FORMAT, "email");
+
+        mockHelper.initializeMockValues();
+
+        RequestSecurityTokenResponseBuilder builder = new RequestSecurityTokenResponseBuilder();
+
+        builder.setRealm(mockHelper.getClientId())
+                .setAction(WSFedConstants.WSFED_SIGNIN_ACTION)
+                .setDestination("https://localhost:8443")
+                .setContext("context")
+                .setTokenExpiration(mockHelper.getAccessTokenLifespan())
+                .setRequestIssuer("https://issuer")
+                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
+                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+
+        //SAML Token generation
+        WsFedSAML11AssertionTypeBuilder samlBuilder = new WsFedSAML11AssertionTypeBuilder();
+        samlBuilder.setRealm(mockHelper.getRealm())
+                .setUriInfo(mockHelper.getUriInfo())
+                .setAccessCode(mockHelper.getAccessCode())
+                .setClientSession(mockHelper.getClientSessionModel())
+                .setUserSession(mockHelper.getUserSessionModel())
+                .setSession(mockHelper.getSession());
+
+        SAML11AssertionType token = samlBuilder.build();
+        builder.setSaml11Token(token);
+
+        RequestSecurityTokenResponse rstr = builder.build();
+
+        assertEquals(builder.getContext(), rstr.getContext());
+        assertNotNull(rstr.getLifetime().getCreated());
+        assertNotNull(rstr.getLifetime().getExpires());
+        assertEquals(XMLTimeUtil.add(rstr.getLifetime().getCreated(), mockHelper.getAccessTokenLifespan() * 1000), rstr.getLifetime().getExpires());
+
+        assertEquals(builder.getRequestIssuer(), ((EndpointReferenceType) rstr.getAppliesTo().getAny().get(0)).getAddress().getValue());
+        assertEquals(URI.create(SAML11Constants.ASSERTION_11_NSURI), rstr.getTokenType());
 
         assertThat(rstr.getRequestedSecurityToken().getAny().get(0), instanceOf(Element.class));
         Element element = (Element)rstr.getRequestedSecurityToken().getAny().get(0);
