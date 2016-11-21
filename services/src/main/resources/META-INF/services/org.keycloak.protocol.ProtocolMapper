@@ -40,4 +40,6 @@ org.keycloak.protocol.wsfed.mappers.OIDCFullNameMapper
 org.keycloak.protocol.wsfed.mappers.OIDCUserPropertyMapper
 org.keycloak.protocol.wsfed.mappers.SAMLRoleListMapper
 org.keycloak.protocol.wsfed.mappers.SAMLUserPropertyAttributeStatementMapper
+org.keycloak.protocol.wsfed.mappers.SAMLUserFullNameAttributeStatementMapper
+org.keycloak.protocol.wsfed.mappers.SAMLUserAttributeStatementMapper
 

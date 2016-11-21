@@ -167,6 +167,18 @@ public class SAML2RequestedToken implements RequestedToken {
     }
 
     @Override
+    public String getLastName() {
+        // TODO: implement getLastName
+        return null;
+    }
+
+    @Override
+    public String getFirstName() {
+        // TODO: implement getFirstName
+        return null;
+    }
+
+    @Override
     public String getEmail() {
         if (getSubjectNameID()!=null && getSubjectNameID().getFormat()!=null) {
             if (getSubjectNameID().getFormat().toString().equals(JBossSAMLURIConstants.NAMEID_FORMAT_EMAIL.get())) {

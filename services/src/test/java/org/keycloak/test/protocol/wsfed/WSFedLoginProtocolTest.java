@@ -17,6 +17,8 @@
 package org.keycloak.test.protocol.wsfed;
 
 import org.keycloak.protocol.wsfed.WSFedLoginProtocol;
+import org.keycloak.protocol.wsfed.WsFedSAMLAssertionTokenFormat;
+import org.keycloak.saml.processing.core.saml.v1.SAML11Constants;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.test.common.MockHelper;
 import org.apache.http.Header;
@@ -113,6 +115,22 @@ public class WSFedLoginProtocolTest {
     }
 
     @Test
+    public void testSaml20AssertionTokenFormat() throws Exception {
+        ClientModel client = mockHelper.getClient();
+        doReturn("SAML 2.0").when(client).getAttribute(WSFedLoginProtocol.WSFED_SAML_ASSERTION_TOKEN_FORMAT);
+
+        assertEquals(WsFedSAMLAssertionTokenFormat.SAML20_ASSERTION_TOKEN_FORMAT, loginProtocol.getSamlAssertionTokenFormat(client));
+    }
+
+    @Test
+    public void testSaml11AssertionTokenFormat() throws Exception {
+        ClientModel client = mockHelper.getClient();
+        doReturn("SAML 1.1").when(client).getAttribute(WSFedLoginProtocol.WSFED_SAML_ASSERTION_TOKEN_FORMAT);
+
+        assertEquals(WsFedSAMLAssertionTokenFormat.SAML11_ASSERTION_TOKEN_FORMAT, loginProtocol.getSamlAssertionTokenFormat(client));
+    }
+
+    @Test
     public void testIncludeX5t() throws Exception {
         ClientModel client = mockHelper.getClient();
         doReturn("true").when(client).getAttribute(WSFedLoginProtocol.WSFED_X5T);
@@ -150,6 +168,31 @@ public class WSFedLoginProtocolTest {
         String wsfedResponse = getInputNodeValue(doc, WSFedConstants.WSFED_RESULT);
         assertNotNull(wsfedResponse);
         assertTokenType(wsfedResponse, "http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0");
+    }
+
+    @Test
+    public void testAuthenticatedSaml11() throws Exception {
+        ClientModel client = mockHelper.getClient();
+        doReturn("false").when(client).getAttribute(WSFedLoginProtocol.WSFED_JWT);
+        doReturn("SAML 1.1").when(client).getAttribute(WSFedLoginProtocol.WSFED_SAML_ASSERTION_TOKEN_FORMAT);
+
+        Response response = loginProtocol.authenticated(mockHelper.getUserSessionModel(), mockHelper.getAccessCode());
+
+        //We already validate token generation through other test classes so this is mainly to ensure the response gets built correctly
+        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        assertEquals(MediaType.TEXT_HTML_TYPE, response.getMetadata().getFirst("Content-Type"));
+        assertEquals("no-cache", response.getMetadata().getFirst("Pragma"));
+        assertEquals("no-cache, no-store", response.getMetadata().getFirst("Cache-Control"));
+
+        Document doc = responseToDocument(response);
+
+        assertFormAction(doc, "POST", mockHelper.getClientSessionModel().getRedirectUri());
+        assertInputNode(doc, WSFedConstants.WSFED_ACTION, WSFedConstants.WSFED_SIGNIN_ACTION);
+        assertInputNode(doc, WSFedConstants.WSFED_REALM, client.getClientId());
+
+        String wsfedResponse = getInputNodeValue(doc, WSFedConstants.WSFED_RESULT);
+        assertNotNull(wsfedResponse);
+        assertTokenType(wsfedResponse, SAML11Constants.ASSERTION_11_NSURI);
     }
 
     @Test

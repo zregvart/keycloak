@@ -192,7 +192,8 @@ public class WsFedSAML11AssertionTypeBuilder extends WsFedSAMLAssertionTypeAbstr
         SAML11AttributeArrayMapper samlAttributeMapper = new SAML11AttributeArrayMapper(attributeStatement);
         samlAttributeMapper.mapAttributes(tempAttributeStatement, attribute -> {
             // TODO what is there to do with SAML2 attribute name format?
-            SAML11AttributeType samlAttribute = new SAML11AttributeType(attribute.getName(), URI.create(ATTRIBUTE_NAMESPACE));
+            String friendlyName = attribute.getFriendlyName() != null ? attribute.getFriendlyName() : attribute.getName();
+            SAML11AttributeType samlAttribute = new SAML11AttributeType(friendlyName, URI.create(ATTRIBUTE_NAMESPACE));
             if (!attribute.getAttributeValue().isEmpty()) {
                 samlAttribute.add(attribute.getAttributeValue().get(0).toString());
             } else {
