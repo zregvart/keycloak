@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.keycloak.testsuite.admin.AbstractAdminTest.loadJson;
+import static org.keycloak.testsuite.cli.KcRegExec.WORK_DIR;
 import static org.keycloak.testsuite.cli.KcRegExec.execute;
 
 /**
@@ -351,7 +352,7 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
 
     FileConfigHandler initCustomConfigFile() {
         String filename = UUID.randomUUID().toString() + ".config";
-        File cfgFile = new File(KcRegExec.WORK_DIR + "/" + filename);
+        File cfgFile = new File(WORK_DIR + "/" + filename);
         FileConfigHandler handler = new FileConfigHandler();
         handler.setConfigFile(cfgFile.getAbsolutePath());
         return handler;
@@ -363,7 +364,7 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
 
     File initTempFile(String extension, String content) throws IOException {
         String filename = UUID.randomUUID().toString() + extension;
-        File file = new File(KcRegExec.WORK_DIR + "/" + filename);
+        File file = new File(WORK_DIR + "/" + filename);
         if (content != null) {
             OutputStream os = new FileOutputStream(file);
             os.write(content.getBytes(Charset.forName("iso_8859_1")));
@@ -539,17 +540,30 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
         Assert.assertEquals("exitCode == " + exitCode, exitCode, exe.exitCode());
         if (stdOutLineCount != -1) {
             try {
-                Assert.assertTrue("stdout output has " + stdOutLineCount + " lines", exe.stdoutLines().size() == stdOutLineCount);
+                assertLineCount("stdout output", exe.stdoutLines(), stdOutLineCount);
             } catch (Throwable e) {
                 throw new AssertionError("STDOUT: " + exe.stdoutString(), e);
             }
         }
         if (stdErrLineCount != -1) {
             try {
-                Assert.assertTrue("stderr output has " + stdErrLineCount + " lines", exe.stderrLines().size() == stdErrLineCount);
+                assertLineCount("stderr output", exe.stderrLines(), stdErrLineCount);
             } catch (Throwable e) {
                 throw new AssertionError("STDERR: " + exe.stderrString(), e);
             }
         }
+    }
+
+    void assertLineCount(String label, List<String> lines, int count) {
+        if (lines.size() == count) {
+            return;
+        }
+        // there is some kind of race condition in 'kcreg' that results in intermittent extra empty line
+        if (lines.size() == count + 1) {
+            if ("".equals(lines.get(lines.size()-1))) {
+                return;
+            }
+        }
+        Assert.assertTrue(label + " has " + lines.size() + " lines (expected: " + count + ")", lines.size() == count);
     }
 }

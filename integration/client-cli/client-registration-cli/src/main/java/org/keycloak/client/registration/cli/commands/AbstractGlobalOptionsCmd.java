@@ -17,7 +17,7 @@ public abstract class AbstractGlobalOptionsCmd implements Command {
     @Option(name = "help", description = "Print command specific help", hasValue = false)
     protected boolean help;
 
-    protected void init(AbstractGlobalOptionsCmd parent) {
+    protected void initFromParent(AbstractGlobalOptionsCmd parent) {
         dumpTrace = parent.dumpTrace;
         help = parent.help;
     }
@@ -27,11 +27,15 @@ public abstract class AbstractGlobalOptionsCmd implements Command {
     }
 
     protected boolean printHelp() {
-        if (help) {
+        if (help || nothingToDo()) {
             printOut(help());
             return true;
         }
 
+        return false;
+    }
+
+    protected boolean nothingToDo() {
         return false;
     }
 
