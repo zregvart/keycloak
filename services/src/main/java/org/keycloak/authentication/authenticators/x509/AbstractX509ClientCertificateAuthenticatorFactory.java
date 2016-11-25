@@ -18,13 +18,12 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.authentication.AuthenticatorFactory;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
-import org.keycloak.services.ServicesLogger;
 
-import java.security.KeyStore;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -42,7 +41,7 @@ import static org.keycloak.provider.ProviderConfigProperty.STRING_TYPE;
 
 public abstract class AbstractX509ClientCertificateAuthenticatorFactory implements AuthenticatorFactory {
 
-    protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    protected static final Logger logger = Logger.getLogger(AbstractX509ClientCertificateAuthenticatorFactory.class);
 
     private static final String[] mappingSources = {
             MAPPING_SOURCE_CERT_SUBJECTDN,

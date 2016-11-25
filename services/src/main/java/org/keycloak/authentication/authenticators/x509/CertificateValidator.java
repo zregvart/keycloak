@@ -18,9 +18,9 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import org.jboss.logging.Logger;
 import org.keycloak.common.util.CRLUtils;
 import org.keycloak.common.util.OCSPUtils;
-import org.keycloak.services.ServicesLogger;
 
 import javax.naming.Context;
 import javax.naming.NamingException;
@@ -60,7 +60,7 @@ import java.util.ArrayList;
 
 public class CertificateValidator {
 
-    private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    private static final Logger logger = Logger.getLogger(CertificateValidator.class);
 
     enum KeyUsageBits {
         DIGITAL_SIGNATURE(0, "digitalSignature"),

@@ -18,6 +18,7 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
@@ -42,7 +43,7 @@ import java.util.Map;
 
 public class ValidateX509CertificateUsername extends AbstractX509ClientCertificateDirectGrantAuthenticator {
 
-    protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    protected static final Logger logger = Logger.getLogger(ValidateX509CertificateUsername.class);
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {
@@ -106,7 +107,7 @@ public class ValidateX509CertificateUsername extends AbstractX509ClientCertifica
             user = getUserIdentityToModelMapper(config).find(context, userIdentity);
         }
         catch(ModelDuplicateException e) {
-            logger.modelDuplicateException(e);
+            ServicesLogger.LOGGER.modelDuplicateException(e);
             String errorMessage = String.format("X509 certificate authentication's failed. Reason: \"%s\"", e.getMessage());
             Response challengeResponse = errorResponse(Response.Status.UNAUTHORIZED.getStatusCode(), "invalid_request", errorMessage);
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);

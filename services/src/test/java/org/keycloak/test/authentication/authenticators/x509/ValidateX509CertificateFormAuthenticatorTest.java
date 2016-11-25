@@ -71,7 +71,6 @@ public class ValidateX509CertificateFormAuthenticatorTest extends AbstractX509Te
     @Mock private UserModel user;
     @Mock private ClientSessionModel clientSession;
     @Mock private HttpRequest context;
-    @Mock private UserCredentialValueModel credentials;
     @Mock private AuthenticationFlowContext flowContext;
     @Mock private AuthenticatorConfigModel config;
     @Mock private UserIdentityExtractor userIdExtractor;

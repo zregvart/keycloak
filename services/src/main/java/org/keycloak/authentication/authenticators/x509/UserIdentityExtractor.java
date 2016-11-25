@@ -23,6 +23,7 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.jboss.logging.Logger;
 import org.keycloak.services.ServicesLogger;
 
 import java.security.cert.X509Certificate;
@@ -38,7 +39,7 @@ import java.util.regex.Pattern;
 
 public abstract class UserIdentityExtractor {
 
-    private static final ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    private static final Logger logger = Logger.getLogger(UserIdentityExtractor.class);
 
     public abstract Object extractUserIdentity(X509Certificate[] certs);
 
