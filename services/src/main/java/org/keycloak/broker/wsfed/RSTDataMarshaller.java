@@ -23,6 +23,7 @@ import org.keycloak.broker.wsfed.readers.SAML11RequestedTokenParser;
 import org.keycloak.broker.wsfed.readers.SAML2RequestedTokenParser;
 import org.keycloak.broker.wsfed.writers.SAML11RequestedTokenWriter;
 import org.keycloak.broker.wsfed.writers.SAML2RequestedTokenWriter;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.saml.common.exceptions.ParsingException;
 import org.keycloak.saml.common.exceptions.ProcessingException;
 import org.keycloak.saml.common.util.StaxUtil;

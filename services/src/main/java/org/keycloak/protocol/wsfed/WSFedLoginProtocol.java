@@ -16,16 +16,6 @@
 
 package org.keycloak.protocol.wsfed;
 
-import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
-import org.keycloak.protocol.wsfed.builders.WsFedSAML11AssertionTypeBuilder;
-import org.keycloak.saml.common.exceptions.ConfigurationException;
-import org.keycloak.saml.common.exceptions.ParsingException;
-import org.keycloak.saml.common.exceptions.ProcessingException;
-import org.keycloak.wsfed.common.WSFedConstants;
-import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
-import org.keycloak.protocol.wsfed.builders.WSFedOIDCAccessTokenBuilder;
-import org.keycloak.wsfed.common.builders.WSFedResponseBuilder;
-import org.keycloak.protocol.wsfed.builders.WSFedSAML2AssertionTypeBuilder;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -33,18 +23,28 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.URIBuilder;
 import org.jboss.logging.Logger;
 import org.keycloak.connections.httpclient.HttpClientProvider;
+import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
 import org.keycloak.dom.saml.v2.assertion.AssertionType;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientSessionModel;
+import org.keycloak.models.KeyManager;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.oidc.utils.RedirectUtils;
+import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
+import org.keycloak.protocol.wsfed.builders.WSFedOIDCAccessTokenBuilder;
+import org.keycloak.protocol.wsfed.builders.WSFedSAML2AssertionTypeBuilder;
+import org.keycloak.protocol.wsfed.builders.WsFedSAML11AssertionTypeBuilder;
+import org.keycloak.saml.common.exceptions.ConfigurationException;
+import org.keycloak.saml.common.exceptions.ProcessingException;
 import org.keycloak.services.ErrorPage;
 import org.keycloak.services.managers.ClientSessionCode;
 import org.keycloak.services.messages.Messages;
+import org.keycloak.wsfed.common.WSFedConstants;
+import org.keycloak.wsfed.common.builders.WSFedResponseBuilder;
 
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
@@ -53,6 +53,9 @@ import javax.ws.rs.core.UriInfo;
 import javax.xml.datatype.DatatypeConfigurationException;
 import java.io.InputStream;
 import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 
 /**
  * Created on 5/19/15.
@@ -124,6 +127,21 @@ public class WSFedLoginProtocol implements LoginProtocol {
         return ErrorPage.error(session, status);
     }
 
+    private X509Certificate getRealmCertificate(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getCertificate();
+    }
+
+    private PrivateKey getRealmPrivateKey(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getPrivateKey();
+    }
+
+    private PublicKey getRealmPublicKey(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getPublicKey();
+    }
+
     @Override
     public Response authenticated(UserSessionModel userSession, ClientSessionCode accessCode) {
         ClientSessionModel clientSession = accessCode.getClientSession();
@@ -140,8 +158,8 @@ public class WSFedLoginProtocol implements LoginProtocol {
                     .setContext(context)
                     .setTokenExpiration(realm.getAccessTokenLifespan())
                     .setRequestIssuer(clientSession.getClient().getClientId())
-                    .setSigningKeyPair(new KeyPair(realm.getPublicKey(), realm.getPrivateKey()))
-                    .setSigningCertificate(realm.getCertificate());
+                    .setSigningKeyPair(new KeyPair(getRealmPublicKey(realm), getRealmPrivateKey(realm)))
+                    .setSigningCertificate(getRealmCertificate(realm));
 
             if (useJwt(client)) {
                 WSFedOIDCAccessTokenBuilder oidcBuilder = new WSFedOIDCAccessTokenBuilder();
@@ -237,7 +255,7 @@ public class WSFedLoginProtocol implements LoginProtocol {
         ClientModel client = clientSession.getClient();
         String logoutUrl = RedirectUtils.verifyRedirectUri(uriInfo, client.getBaseUrl(), realm, client);
         if (logoutUrl == null) {
-            logger.warnv("Can't do backchannel logout. No SingleLogoutService POST Binding registered for client: {1}", client.getClientId());
+            logger.warnv("Can't do backchannel logout. No SingleLogoutService POST Binding registered for client: {0}", client.getClientId());
             return;
         }
 

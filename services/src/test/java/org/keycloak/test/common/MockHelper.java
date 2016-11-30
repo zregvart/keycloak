@@ -27,6 +27,8 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import javax.ws.rs.core.Cookie;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
@@ -34,9 +36,12 @@ import java.net.URI;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.util.*;
 
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -79,6 +84,10 @@ public class MockHelper {
     private ClientSessionCode accessCode;
     @Mock
     private UserSessionModel userSessionModel;
+    @Mock
+    private KeyManager keyManager;
+    @Mock
+    private KeyManager.ActiveKey activeKey;
 
     public MockHelper() {
         resetMocks();
@@ -123,10 +132,10 @@ public class MockHelper {
         when(getRealm().isEnabled()).thenReturn(true);
         when(getRealm().getAccessCodeLifespan()).thenReturn(getAccessCodeLifespan());
         when(getRealm().getAccessTokenLifespan()).thenReturn(getAccessTokenLifespan());
-        generateRealmKeys(getRealm());
+        generateRealmKeys(getActiveKey(), getRealm());
     }
 
-    public static void generateRealmKeys(RealmModel realm) {
+    public static void generateRealmKeys(KeyManager.ActiveKey activeKey, RealmModel realm) {
         KeyPair keyPair = null;
         try {
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
@@ -136,10 +145,10 @@ public class MockHelper {
             throw new RuntimeException(e);
         }
 
-        when(realm.getPublicKey()).thenReturn(keyPair.getPublic());
-        when(realm.getPublicKeyPem()).thenReturn(KeycloakModelUtils.getPemFromKey(keyPair.getPublic()));
-        when(realm.getPrivateKey()).thenReturn(keyPair.getPrivate());
-        when(realm.getPrivateKeyPem()).thenReturn(KeycloakModelUtils.getPemFromKey(keyPair.getPrivate()));
+        when(activeKey.getPublicKey()).thenReturn(keyPair.getPublic());
+        //when(realm.getPublicKeyPem()).thenReturn(KeycloakModelUtils.getPemFromKey(keyPair.getPublic()));
+        when(activeKey.getPrivateKey()).thenReturn(keyPair.getPrivate());
+        //when(realm.getPrivateKeyPem()).thenReturn(KeycloakModelUtils.getPemFromKey(keyPair.getPrivate()));
 
         X509Certificate certificate = null;
         try {
@@ -148,12 +157,16 @@ public class MockHelper {
             throw new RuntimeException(e);
         }
 
-        when(realm.getCertificate()).thenReturn(certificate);
-        when(realm.getCertificatePem()).thenReturn(KeycloakModelUtils.getPemFromCertificate(certificate));
+        when(activeKey.getCertificate()).thenReturn(certificate);
+        //when(realm.getCertificatePem()).thenReturn(KeycloakModelUtils.getPemFromCertificate(certificate));
 
-        String codeSecret = KeycloakModelUtils.generateCodeSecret();
-        when(realm.getCodeSecret()).thenReturn(codeSecret);
-        when(realm.getCodeSecretKey()).thenReturn(KeycloakModelUtils.getSecretKey(codeSecret));
+        // KEYCLOAK-905 introduced key chain to allow for key rotation. Old versions
+        // of keycloak used the realm secret to encode the session cookie. In the aforementioned
+        // change the secret was made obsolete and replaced with public key digital signature
+        // that relies on the realm keys.
+        //String codeSecret = KeycloakModelUtils.generateCodeSecret();
+        //when(realm.getCodeSecret()).thenReturn(codeSecret);
+        //when(realm.getCodeSecretKey()).thenReturn(KeycloakModelUtils.getSecretKey(codeSecret));
     }
 
     protected void initializeClientModelMock() {
@@ -204,7 +217,10 @@ public class MockHelper {
         when(getSession().sessions().getUserSessionByBrokerSessionId(realm, userSessionModel.getBrokerSessionId())).thenReturn(userSessionModel);
         when(getSession().sessions().getUserSessionByBrokerUserId(realm, getUser().getId())).thenReturn(Arrays.asList(userSessionModel));
 
-        when(getSession().getContext()).thenReturn(mock(KeycloakContext.class));
+        doReturn(mock(KeycloakContext.class)).when(getSession()).getContext();
+
+        doReturn(keyManager).when(getSession()).keys();
+        doReturn(activeKey).when(getKeyManager()).getActiveKey(any());
     }
 
     protected void intializeKeycloakSessionFactoryMock() {
@@ -368,6 +384,30 @@ public class MockHelper {
         return this;
     }
 
+    public KeyManager getKeyManager() {
+        return keyManager;
+    }
+
+    public PublicKey getPublicKey() {
+        return getActiveKey().getPublicKey();
+    }
+
+    public PrivateKey getPrivateKey() {
+        return getActiveKey().getPrivateKey();
+    }
+
+    public X509Certificate getCertificate() {
+        return getActiveKey().getCertificate();
+    }
+
+    public String getCertificatePem() {
+        return KeycloakModelUtils.getPemFromCertificate(getCertificate());
+    }
+
+    public KeyManager.ActiveKey getActiveKey() {
+        return activeKey;
+    }
+
     public KeycloakSession getSession() {
         return session;
     }
@@ -383,6 +423,7 @@ public class MockHelper {
 
     public MockHelper setSession(KeycloakSession session) {
         this.session = session;
+        this.keyManager = this.session.keys();
         return this;
     }
 

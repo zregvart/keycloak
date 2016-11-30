@@ -66,7 +66,7 @@ public class WSFedIdentityProviderTest {
         doReturn("https://destinationUrl").when(config).getWsFedUrl();
         doReturn("https://realm").when(config).getWsFedRealm();
 
-        identityProvider = spy(new WSFedIdentityProvider(config));
+        identityProvider = spy(new WSFedIdentityProvider(mockHelper.getSession(), config));
     }
 
     @Test
@@ -171,7 +171,7 @@ public class WSFedIdentityProviderTest {
         assertEquals(RealmsResource.realmBaseUrl(mockHelper.getUriInfo()).build(mockHelper.getRealmName()).toString(), node.getAttributes().getNamedItem("ServiceDisplayName").getTextContent());
 
         node = assertNode(doc, "/ns:EntityDescriptor/ns:RoleDescriptor/ns:KeyDescriptor/dsig:KeyInfo/dsig:X509Data/dsig:X509Certificate", nsContext);
-        assertEquals(mockHelper.getRealm().getCertificatePem(), node.getTextContent().trim());
+        assertEquals(mockHelper.getCertificatePem(), node.getTextContent().trim());
 
         node = assertNode(doc, "/ns:EntityDescriptor/ns:RoleDescriptor/fed:ApplicationServiceEndpoint/wsa:EndpointReference/wsa:Address", nsContext);
         assertEquals(identityProvider.getEndpoint(mockHelper.getUriInfo(), mockHelper.getRealm()), node.getTextContent());

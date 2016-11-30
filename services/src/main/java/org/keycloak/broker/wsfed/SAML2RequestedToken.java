@@ -17,10 +17,12 @@
 package org.keycloak.broker.wsfed;
 
 import org.jboss.logging.Logger;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.dom.saml.v2.assertion.*;
 import org.keycloak.events.Errors;
 import org.keycloak.events.EventBuilder;
 import org.keycloak.events.EventType;
+import org.keycloak.models.KeyManager;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.saml.common.constants.JBossSAMLConstants;
@@ -59,6 +61,7 @@ import java.io.StringReader;
 import java.net.URI;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 import java.util.List;
 
 /**
@@ -70,9 +73,9 @@ public class SAML2RequestedToken implements RequestedToken {
     private AssertionType saml2Assertion;
     private String wsfedResponse;
 
-    public SAML2RequestedToken(String wsfedResponse, Object token, RealmModel realm) throws IOException, ParsingException, ProcessingException, ConfigurationException {
+    public SAML2RequestedToken(KeycloakSession session, String wsfedResponse, Object token, RealmModel realm) throws IOException, ParsingException, ProcessingException, ConfigurationException {
         this.wsfedResponse = wsfedResponse;
-        this.saml2Assertion = getAssertionType(token, realm);
+        this.saml2Assertion = getAssertionType(session, token, realm);
     }
 
     protected SAML2RequestedToken(String wsfedResponse, AssertionType assertion) {
@@ -215,7 +218,13 @@ public class SAML2RequestedToken implements RequestedToken {
         return null;
     }
 
-    public AssertionType getAssertionType(Object token, RealmModel realm) throws IOException, ParsingException, ProcessingException, ConfigurationException {
+    private static PrivateKey getRealmPrivateKey(KeycloakSession session, RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getPrivateKey();
+    }
+
+
+    public AssertionType getAssertionType(KeycloakSession session, Object token, RealmModel realm) throws IOException, ParsingException, ProcessingException, ConfigurationException {
         AssertionType assertionType =  null;
         ByteArrayInputStream bis = null;
         try {
@@ -226,7 +235,7 @@ public class SAML2RequestedToken implements RequestedToken {
             Object assertion = parser.parse(bis);
 
             if(assertion instanceof EncryptedAssertionType) {
-                assertionType = decryptAssertion((EncryptedAssertionType) assertion, realm.getPrivateKey());
+                assertionType = decryptAssertion((EncryptedAssertionType) assertion, getRealmPrivateKey(session, realm));
             }
             else {
                 assertionType = (AssertionType) assertion;

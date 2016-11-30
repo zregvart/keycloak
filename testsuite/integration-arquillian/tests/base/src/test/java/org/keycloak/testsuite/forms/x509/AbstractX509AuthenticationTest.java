@@ -28,6 +28,7 @@ import org.keycloak.authentication.authenticators.x509.ValidateX509CertificateUs
 import org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel;
 import org.keycloak.authentication.authenticators.x509.X509ClientCertificateAuthenticatorFactory;
 import org.keycloak.events.admin.OperationType;
+import org.keycloak.events.admin.ResourceType;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.representations.idm.*;
 import org.keycloak.testsuite.AssertEvents;
@@ -195,7 +196,7 @@ public abstract class AbstractX509AuthenticationTest extends TestRealmKeycloakTe
         finally {
             response.close();
         }
-        assertAdminEvents.assertEvent(REALM_NAME, OperationType.CREATE, AssertAdminEvents.isExpectedPrefixFollowedByUuid(AdminEventPaths.authFlowsPath()), flowRep);
+        assertAdminEvents.assertEvent(REALM_NAME, OperationType.CREATE, AssertAdminEvents.isExpectedPrefixFollowedByUuid(AdminEventPaths.authFlowsPath()), flowRep, ResourceType.AUTH_FLOW);
 
         for (AuthenticationFlowRepresentation flow : authMgmtResource.getFlows()) {
             if (flow.getAlias().equalsIgnoreCase(flowRep.getAlias())) {
@@ -210,7 +211,7 @@ public abstract class AbstractX509AuthenticationTest extends TestRealmKeycloakTe
         HashMap<String, String> params = new HashMap<>();
         params.put("newName", newFlow);
         Response response = authMgmtResource.copy(existingFlow, params);
-        assertAdminEvents.assertEvent(REALM_NAME, OperationType.CREATE, URLDecoder.decode(AdminEventPaths.authCopyFlowPath(existingFlow)), params);
+        assertAdminEvents.assertEvent(REALM_NAME, OperationType.CREATE, URLDecoder.decode(AdminEventPaths.authCopyFlowPath(existingFlow)), params, ResourceType.AUTH_FLOW);
         try {
             Assert.assertEquals("Copy flow", 201, response.getStatus());
         } finally {

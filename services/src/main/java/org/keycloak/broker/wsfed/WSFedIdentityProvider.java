@@ -17,6 +17,7 @@
 package org.keycloak.broker.wsfed;
 
 import org.keycloak.broker.provider.*;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.models.*;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.wsfed.common.builders.WSFedResponseBuilder;
@@ -35,8 +36,8 @@ import java.io.InputStream;
 public class WSFedIdentityProvider extends AbstractIdentityProvider<WSFedIdentityProviderConfig> {
     protected static final Logger logger = Logger.getLogger(WSFedIdentityProvider.class);
 
-    public WSFedIdentityProvider(WSFedIdentityProviderConfig config) {
-        super(config);
+    public WSFedIdentityProvider(KeycloakSession session, WSFedIdentityProviderConfig config) {
+        super(session, config);
     }
 
     @Override
@@ -116,6 +117,11 @@ public class WSFedIdentityProvider extends AbstractIdentityProvider<WSFedIdentit
         }
     }
 
+    private String getRealmCertificatePem(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return PemUtils.encodeCertificate(keys.getActiveKey(realm).getCertificate());
+    }
+
     @Override
     public Response export(UriInfo uriInfo, RealmModel realm, String format) {
         try {
@@ -126,7 +132,7 @@ public class WSFedIdentityProvider extends AbstractIdentityProvider<WSFedIdentit
             template = template.replace("${idp.display.name}", RealmsResource.realmBaseUrl(uriInfo).build(realm.getName()).toString());
             template = template.replace("${idp.sso.sp}", getEndpoint(uriInfo, realm));
             template = template.replace("${idp.sso.passive}", getEndpoint(uriInfo, realm));
-            template = template.replace("${idp.signing.certificate}", realm.getCertificatePem());
+            template = template.replace("${idp.signing.certificate}", getRealmCertificatePem(realm));
 
             return Response.ok(template, MediaType.APPLICATION_XML_TYPE).build();
         }
@@ -147,4 +153,5 @@ public class WSFedIdentityProvider extends AbstractIdentityProvider<WSFedIdentit
     public IdentityProviderDataMarshaller getMarshaller() {
         return new RSTDataMarshaller();
     }
+
 }

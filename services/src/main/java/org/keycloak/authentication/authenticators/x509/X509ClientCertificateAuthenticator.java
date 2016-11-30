@@ -18,6 +18,7 @@
 
 package org.keycloak.authentication.authenticators.x509;
 
+import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationProcessor;
 import org.keycloak.authentication.authenticators.browser.AbstractUsernameFormAuthenticator;
@@ -44,7 +45,7 @@ import java.util.Map;
  */
 public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertificateAuthenticator {
 
-    protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    protected static Logger logger = Logger.getLogger(X509ClientCertificateAuthenticator.class);
 
     @Override
     public void close() {
@@ -125,7 +126,7 @@ public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertif
                 user = getUserIdentityToModelMapper(config).find(context, userIdentity);
             }
             catch(ModelDuplicateException e) {
-                logger.modelDuplicateException(e);
+                ServicesLogger.LOGGER.modelDuplicateException(e);
                 String errorMessage = "X509 certificate authentication's failed.";
                 // TODO is calling form().setErrors enough to show errors on login screen?
                 context.challenge(createErrorResponse(context, certs[0].getSubjectDN().getName(),

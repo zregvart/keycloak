@@ -17,6 +17,7 @@
 package org.keycloak.test.common;
 
 import org.keycloak.broker.provider.IdentityBrokerException;
+import org.keycloak.jose.jws.JWSBuilder;
 import org.keycloak.jose.jws.JWSInput;
 import org.keycloak.jose.jws.JWSInputException;
 import org.keycloak.jose.jws.crypto.RSAProvider;
@@ -41,6 +42,7 @@ import javax.xml.xpath.*;
 import java.io.StringWriter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Iterator;
@@ -205,7 +207,8 @@ public class TestHelpers {
 
         try {
             JWSInput jws = new JWSInput(encodedToken);
-            assertTrue(RSAProvider.verify(jws, mockHelper.getRealm().getPublicKey()));
+            PublicKey publicKey = mockHelper.getPublicKey();
+            assertTrue(RSAProvider.verify(jws, publicKey));
 
             JsonWebToken token = jws.readJsonContent(JsonWebToken.class);
 

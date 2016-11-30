@@ -21,6 +21,7 @@ package org.keycloak.authentication.authenticators.x509;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.forms.login.LoginFormsProvider;
@@ -46,7 +47,7 @@ import java.util.function.Function;
 public abstract class AbstractX509ClientCertificateAuthenticator implements Authenticator {
 
     public static final String DEFAULT_ATTRIBUTE_NAME = "usercertificate";
-    protected static ServicesLogger logger = ServicesLogger.ROOT_LOGGER;
+    protected static Logger logger = Logger.getLogger(AbstractX509ClientCertificateAuthenticator.class);
 
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
 

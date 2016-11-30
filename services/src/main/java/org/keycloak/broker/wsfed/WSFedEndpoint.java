@@ -292,7 +292,7 @@ public class WSFedEndpoint {
 
             if (rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:2.0:assertion")) == 0 ||
                     rstr.getTokenType().compareTo(URI.create("http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV2.0")) == 0) {
-                token = new SAML2RequestedToken(wsfedResponse, rt, realm);
+                token = new SAML2RequestedToken(session, wsfedResponse, rt, realm);
             } else if (rstr.getTokenType().compareTo(URI.create("urn:oasis:names:tc:SAML:1.0:assertion")) == 0) {
                 token = new SAML11RequestedToken(wsfedResponse, rt, realm);
             } else if (rstr.getTokenType().compareTo(URI.create("urn:ietf:params:oauth:token-type:jwt")) == 0) {

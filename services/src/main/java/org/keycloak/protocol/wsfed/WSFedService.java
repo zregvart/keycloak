@@ -16,6 +16,8 @@
 
 package org.keycloak.protocol.wsfed;
 
+import org.keycloak.common.util.CertificateUtils;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.services.managers.AppAuthManager;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.protocol.wsfed.builders.WSFedProtocolParameters;
@@ -110,6 +112,11 @@ public class WSFedService {
         return handleWsFedRequest();
     }
 
+    private String getRealmCertificatePem(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return PemUtils.encodeCertificate(keys.getActiveKey(realm).getCertificate());
+    }
+
     @GET
     @Path("descriptor")
     @Produces(MediaType.APPLICATION_XML)
@@ -119,7 +126,7 @@ public class WSFedService {
         template = template.replace("${idp.entityID}", RealmsResource.realmBaseUrl(uriInfo).build(realm.getName()).toString());
         template = template.replace("${idp.sso.sts}", RealmsResource.protocolUrl(uriInfo).build(realm.getName(), WSFedLoginProtocol.LOGIN_PROTOCOL).toString());
         template = template.replace("${idp.sso.passive}", RealmsResource.protocolUrl(uriInfo).build(realm.getName(), WSFedLoginProtocol.LOGIN_PROTOCOL).toString());
-        template = template.replace("${idp.signing.certificate}", realm.getCertificatePem());
+        template = template.replace("${idp.signing.certificate}", getRealmCertificatePem(realm));
         return template;
 
     }
@@ -258,7 +265,8 @@ public class WSFedService {
         clientSession.setAuthMethod(WSFedLoginProtocol.LOGIN_PROTOCOL);
         clientSession.setRedirectUri(redirect);
         clientSession.setAction(ClientSessionModel.Action.AUTHENTICATE.name());
-        clientSession.setNote(ClientSessionModel.ACTION_KEY, KeycloakModelUtils.generateCodeSecret());
+        // UNDONE: find out what was ClientSessionModel.ACTION_KEY replaced with
+        // clientSession.setNote(ClientSessionModel.ACTION_KEY, KeycloakModelUtils.generateCodeSecret());
         clientSession.setNote(WSFedConstants.WSFED_CONTEXT, params.getWsfed_context());
         clientSession.setNote(OIDCLoginProtocol.ISSUER, RealmsResource.realmBaseUrl(uriInfo).build(realm.getName()).toString());
 
@@ -268,7 +276,7 @@ public class WSFedService {
             IdentityProviderModel identityProviderModel = realm.getIdentityProviderByAlias(idpHint);
 
             if (identityProviderModel != null) {
-                return buildRedirectToIdentityProvider(idpHint, new ClientSessionCode(realm, clientSession).getCode());
+                return buildRedirectToIdentityProvider(idpHint, new ClientSessionCode(session, realm, clientSession).getCode());
             }
         }
 
@@ -286,7 +294,7 @@ public class WSFedService {
         List<IdentityProviderModel> identityProviders = realm.getIdentityProviders();
         for (IdentityProviderModel identityProvider : identityProviders) {
             if (identityProvider.isAuthenticateByDefault()) {
-                return buildRedirectToIdentityProvider(identityProvider.getAlias(), new ClientSessionCode(realm, clientSession).getCode() );
+                return buildRedirectToIdentityProvider(identityProvider.getAlias(), new ClientSessionCode(session, realm, clientSession).getCode() );
             }
         }
         AuthenticationFlowModel flow = realm.getBrowserFlow();
@@ -304,7 +312,7 @@ public class WSFedService {
                 .setRequest(request);
 
         try {
-            RestartLoginCookie.setRestartCookie(realm, clientConnection, uriInfo, clientSession);
+            RestartLoginCookie.setRestartCookie(session, realm, clientConnection, uriInfo, clientSession);
             return processor.authenticate();
         } catch (Exception e) {
             return processor.handleBrowserException(e);

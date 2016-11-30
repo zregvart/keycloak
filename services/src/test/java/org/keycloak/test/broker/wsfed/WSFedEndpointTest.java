@@ -20,6 +20,8 @@ import org.keycloak.broker.wsfed.RequestedToken;
 import org.keycloak.broker.wsfed.WSFedEndpoint;
 import org.keycloak.broker.wsfed.WSFedIdentityProvider;
 import org.keycloak.broker.wsfed.WSFedIdentityProviderConfig;
+import org.keycloak.models.KeyManager;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.test.common.TestHelpers;
 import org.keycloak.wsfed.common.WSFedConstants;
 import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
@@ -155,7 +157,7 @@ public class WSFedEndpointTest {
     @Test
     public void testExecuteHandleWsfedResponse() {
         when(config.handleEmptyActionAsLogout()).thenReturn(false);
-        doReturn(mock(Response.class)).when(endpoint).handleWsFedResponse("result", "context");
+        doReturn(mock(Response.class)).when(endpoint).handleWsFedResponse(eq("result"), eq("context"));
 
         Response response = endpoint.execute(WSFedConstants.WSFED_SIGNIN_ACTION, "result", "context");
         assertNotNull(response);
@@ -166,23 +168,23 @@ public class WSFedEndpointTest {
     @Test
     public void testExecuteHandleSignoutRequest() {
         when(config.handleEmptyActionAsLogout()).thenReturn(false);
-        doReturn(mock(Response.class)).when(endpoint).handleSignoutRequest("context");
+        doReturn(mock(Response.class)).when(endpoint).handleSignoutRequest(eq("context"));
 
         Response response = endpoint.execute(WSFedConstants.WSFED_SIGNOUT_ACTION, null, "context");
         assertNotNull(response);
 
-        verify(endpoint, times(1)).handleSignoutRequest("context");
+        verify(endpoint, times(1)).handleSignoutRequest(eq("context"));
     }
 
     @Test
-    public void testExecuteHandleSignoutResponse() {
+    public void testExecuteHandleSignoutCleanupResponse() {
         when(config.handleEmptyActionAsLogout()).thenReturn(false);
-        doReturn(mock(Response.class)).when(endpoint).handleSignoutResponse("context");
+        doReturn(mock(Response.class)).when(endpoint).handleSignoutCleanupResponse(eq("context"));
 
         Response response = endpoint.execute(WSFedConstants.WSFED_SIGNOUT_CLEANUP_ACTION, null, "context");
         assertNotNull(response);
 
-        verify(endpoint, times(1)).handleSignoutResponse("context");
+        verify(endpoint, times(1)).handleSignoutCleanupResponse(eq("context"));
     }
 
     @Test
@@ -382,8 +384,9 @@ public class WSFedEndpointTest {
         when(config.isValidateSignature()).thenReturn(true);
 
         RealmModel junkRealm = mock(RealmModel.class);
-        MockHelper.generateRealmKeys(junkRealm);
-        doReturn(junkRealm.getPublicKey()).when(endpoint).getIDPKey();
+        KeyManager.ActiveKey junkKey = mock(KeyManager.ActiveKey.class);
+        MockHelper.generateRealmKeys(junkKey, junkRealm);
+        doReturn(junkKey.getPublicKey()).when(endpoint).getIDPKey();
 
         Response response = endpoint.handleWsFedResponse(builder.getStringValue(), builder.getContext());
 
@@ -398,7 +401,7 @@ public class WSFedEndpointTest {
         when(config.isValidateSignature()).thenReturn(true);
         when(config.getWsFedRealm()).thenReturn(mockHelper.getClientId());
 
-        doReturn(mockHelper.getRealm().getPublicKey()).when(endpoint).getIDPKey();
+        doReturn(mockHelper.getPublicKey()).when(endpoint).getIDPKey();
 
         Response success = mock(Response.class);
         doReturn(success).when(endpoint).handleLoginResponse(eq(wsfedResponse), any(RequestedToken.class), eq(builder.getContext()));
@@ -413,12 +416,12 @@ public class WSFedEndpointTest {
 
     @Test
     public void testGetIDPKey() throws Exception {
-        String pem = mockHelper.getRealm().getCertificatePem();
+        String pem = mockHelper.getCertificatePem();
         when(config.getSigningCertificate()).thenReturn(pem);
 
         PublicKey key = endpoint.getIDPKey();
 
-        assertEquals(mockHelper.getRealm().getPublicKey(), key);
+        assertEquals(mockHelper.getPublicKey(), key);
     }
 
     @Test

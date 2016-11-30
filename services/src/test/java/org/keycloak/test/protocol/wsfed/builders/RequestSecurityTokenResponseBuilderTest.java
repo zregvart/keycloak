@@ -16,6 +16,7 @@
 
 package org.keycloak.test.protocol.wsfed.builders;
 
+import org.keycloak.broker.wsfed.SAML11RequestedToken;
 import org.keycloak.dom.saml.v1.assertion.SAML11AssertionType;
 import org.keycloak.protocol.wsfed.builders.RequestSecurityTokenResponseBuilder;
 import org.keycloak.protocol.wsfed.builders.WSFedOIDCAccessTokenBuilder;
@@ -98,8 +99,8 @@ public class RequestSecurityTokenResponseBuilderTest {
                 .setContext("context")
                 .setTokenExpiration(mockHelper.getAccessTokenLifespan())
                 .setRequestIssuer("https://issuer")
-                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
-                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+                .setSigningKeyPair(new KeyPair(mockHelper.getPublicKey(), mockHelper.getPrivateKey()))
+                .setSigningCertificate(mockHelper.getCertificate());
 
         //SAML Token generation
         WSFedSAML2AssertionTypeBuilder samlBuilder = new WSFedSAML2AssertionTypeBuilder();
@@ -125,7 +126,7 @@ public class RequestSecurityTokenResponseBuilderTest {
 
         assertThat(rstr.getRequestedSecurityToken().getAny().get(0), instanceOf(Element.class));
         Element element = (Element)rstr.getRequestedSecurityToken().getAny().get(0);
-        assertTrue(AssertionUtil.isSignatureValid(element, mockHelper.getRealm().getPublicKey()));
+        assertTrue(AssertionUtil.isSignatureValid(element, mockHelper.getPublicKey()));
     }
 
     @Test
@@ -145,8 +146,8 @@ public class RequestSecurityTokenResponseBuilderTest {
                 .setContext("context")
                 .setTokenExpiration(mockHelper.getAccessTokenLifespan())
                 .setRequestIssuer("https://issuer")
-                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
-                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+                .setSigningKeyPair(new KeyPair(mockHelper.getPublicKey(), mockHelper.getPrivateKey()))
+                .setSigningCertificate(mockHelper.getCertificate());
 
         //SAML Token generation
         WsFedSAML11AssertionTypeBuilder samlBuilder = new WsFedSAML11AssertionTypeBuilder();
@@ -172,7 +173,7 @@ public class RequestSecurityTokenResponseBuilderTest {
 
         assertThat(rstr.getRequestedSecurityToken().getAny().get(0), instanceOf(Element.class));
         Element element = (Element)rstr.getRequestedSecurityToken().getAny().get(0);
-        assertTrue(AssertionUtil.isSignatureValid(element, mockHelper.getRealm().getPublicKey()));
+        assertTrue(SAML11RequestedToken.isSignatureValid(element, mockHelper.getPublicKey()));
     }
 
     @Test
@@ -191,8 +192,8 @@ public class RequestSecurityTokenResponseBuilderTest {
                 .setContext("context")
                 .setTokenExpiration(mockHelper.getAccessTokenLifespan())
                 .setRequestIssuer("https://issuer")
-                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
-                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+                .setSigningKeyPair(new KeyPair(mockHelper.getPublicKey(), mockHelper.getPrivateKey()))
+                .setSigningCertificate(mockHelper.getCertificate());
 
         //OIDC Token generation
         WSFedOIDCAccessTokenBuilder oidcBuilder = new WSFedOIDCAccessTokenBuilder();
@@ -242,8 +243,8 @@ public class RequestSecurityTokenResponseBuilderTest {
                 .setContext("context")
                 .setTokenExpiration(mockHelper.getAccessTokenLifespan())
                 .setRequestIssuer("https://issuer")
-                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
-                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+                .setSigningKeyPair(new KeyPair(mockHelper.getPublicKey(), mockHelper.getPrivateKey()))
+                .setSigningCertificate(mockHelper.getCertificate());
 
         //OIDC Token generation
         WSFedOIDCAccessTokenBuilder oidcBuilder = new WSFedOIDCAccessTokenBuilder();

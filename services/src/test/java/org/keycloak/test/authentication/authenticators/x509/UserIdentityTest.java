@@ -69,7 +69,6 @@ public class UserIdentityTest {
     @Mock private UserModel user;
     @Mock private ClientSessionModel clientSession;
     @Mock private HttpRequest context;
-    @Mock private UserCredentialValueModel credentials;
     @Mock private AuthenticationFlowContext flowContext;
     @Mock private AuthenticatorConfigModel config;
     @Mock private UserIdentityToModelMapper userIdModelMapper;

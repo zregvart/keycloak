@@ -18,6 +18,7 @@ package org.keycloak.test.protocol.wsfed;
 
 import org.keycloak.protocol.wsfed.WSFedLoginProtocol;
 import org.keycloak.protocol.wsfed.WSFedService;
+import org.keycloak.services.managers.ClientSessionCode;
 import org.keycloak.test.common.MockHelper;
 import org.keycloak.test.common.TestHelpers;
 import org.keycloak.wsfed.common.WSFedConstants;
@@ -134,7 +135,8 @@ public class WSFedServiceTest {
         WSFedNamespaceContext nsContext = new WSFedNamespaceContext("urn:oasis:names:tc:SAML:2.0:metadata");
 
         Node node = assertNode(doc, "/ns:EntityDescriptor/ns:RoleDescriptor/ns:KeyDescriptor/dsig:KeyInfo/dsig:X509Data/dsig:X509Certificate", nsContext);
-        assertEquals(mockHelper.getRealm().getCertificatePem(), node.getTextContent().trim());
+
+        assertEquals(mockHelper.getCertificatePem(), node.getTextContent().trim());
 
         node = assertNode(doc, "/ns:EntityDescriptor/ns:RoleDescriptor/fed:SecurityTokenServiceEndpoint/wsa:EndpointReference/wsa:Address", nsContext);
         assertEquals(RealmsResource.protocolUrl(mockHelper.getUriInfo()).build(mockHelper.getRealmName(), WSFedLoginProtocol.LOGIN_PROTOCOL).toString(), node.getTextContent());
@@ -526,7 +528,7 @@ public class WSFedServiceTest {
         verify(clientSession, times(1)).setAuthMethod(eq(WSFedLoginProtocol.LOGIN_PROTOCOL));
         verify(clientSession, times(1)).setRedirectUri(eq(params.getWsfed_reply()));
         verify(clientSession, times(1)).setAction(eq(ClientSessionModel.Action.AUTHENTICATE.name()));
-        verify(clientSession, times(1)).setNote(eq(ClientSessionModel.ACTION_KEY), anyString());
+//        verify(clientSession, times(1)).setNote(eq(ClientSessionModel.ACTION_SIGNATURE), anyString());
         verify(clientSession, times(1)).setNote(eq(WSFedConstants.WSFED_CONTEXT), eq(params.getWsfed_context()));
         String issuer = RealmsResource.realmBaseUrl(mockHelper.getUriInfo()).build(mockHelper.getRealmName()).toString();
         verify(clientSession, times(1)).setNote(eq(OIDCLoginProtocol.ISSUER), eq(issuer));
@@ -542,7 +544,10 @@ public class WSFedServiceTest {
 
         ClientSessionModel clientSession = mock(ClientSessionModel.class);
         when(clientSession.getId()).thenReturn(UUID.randomUUID().toString());
-        when(clientSession.getNote(ClientSessionModel.ACTION_KEY)).thenReturn(KeycloakModelUtils.generateCodeSecret()); //This is normally set in method but because we are mocked we need to return it
+
+//        ClientSessionCode sessionCode = new ClientSessionCode(mockHelper.getSession(), mockHelper.getRealm(), mockHelper.getClientSessionModel());
+//        sessionCode.getCode();
+//        when(clientSession.getNote(ClientSessionModel.ACTION_SIGNATURE)).thenReturn(sessionCode.getCode()); //This is normally set in method but because we are mocked we need to return it
         when(clientSession.getClient()).thenReturn(mockHelper.getClient());
 
         UserSessionProvider provider = mockHelper.getSession().sessions();
@@ -577,7 +582,7 @@ public class WSFedServiceTest {
 
         ClientSessionModel clientSession = mock(ClientSessionModel.class);
         when(clientSession.getId()).thenReturn(UUID.randomUUID().toString());
-        when(clientSession.getNote(ClientSessionModel.ACTION_KEY)).thenReturn(KeycloakModelUtils.generateCodeSecret()); //This is normally set in method but because we are mocked we need to return it
+        //when(clientSession.getNote(ClientSessionModel.ACTION_KEY)).thenReturn(KeycloakModelUtils.generateCodeSecret()); //This is normally set in method but because we are mocked we need to return it
         when(clientSession.getClient()).thenReturn(mockHelper.getClient());
 
         UserSessionProvider provider = mockHelper.getSession().sessions();

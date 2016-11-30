@@ -109,7 +109,7 @@ public class WSFedOIDCAccessTokenBuilderTest {
         String encodedHeader = jws.getEncodedHeader();
         encodedHeader = new String(Base64.decode(encodedHeader), "UTF-8");
 
-        assertThat(encodedHeader, containsString(String.format("\"x5t\":\"%s\"", TestHelpers.getThumbPrint(mockHelper.getRealm().getCertificate()))));
+        assertThat(encodedHeader, containsString(String.format("\"x5t\":\"%s\"", TestHelpers.getThumbPrint(mockHelper.getCertificate()))));
 
         JWSHeader header = jws.getHeader();
         assertNotNull(header);

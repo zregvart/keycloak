@@ -16,6 +16,7 @@
 
 package org.keycloak.protocol.wsfed.builders;
 
+import org.keycloak.models.KeyManager;
 import org.keycloak.protocol.wsfed.mappers.WSFedOIDCAccessTokenMapper;
 import org.keycloak.jose.jws.Algorithm;
 import org.keycloak.jose.jws.JWSBuilder;
@@ -35,6 +36,7 @@ import org.keycloak.common.util.Base64Url;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.io.UnsupportedEncodingException;
@@ -111,15 +113,25 @@ public class WSFedOIDCAccessTokenBuilder {
         return encodeToken(realm, accessToken);
     }
 
+    private X509Certificate getRealmCertificate(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getCertificate();
+    }
+
+    private PrivateKey getRealmPrivateKey(RealmModel realm) {
+        KeyManager keys = session.keys();
+        return keys.getActiveKey(realm).getPrivateKey();
+    }
+
     public String encodeToken(RealmModel realm, Object token) throws NoSuchAlgorithmException, CertificateEncodingException {
         JWSBuilderExtended builder = new JWSBuilderExtended().type("JWT");
 
         if(isX5tIncluded()) {
-            builder.x5t(realm.getCertificate());
+            builder.x5t(getRealmCertificate(realm));
         }
 
         String encodedToken = builder.jsonContent(token)
-                                     .rsa256(realm.getPrivateKey());
+                                     .rsa256(getRealmPrivateKey(realm));
 
         return encodedToken;
     }
@@ -183,7 +195,7 @@ public class WSFedOIDCAccessTokenBuilder {
 
     public AccessToken transformAccessToken(KeycloakSession session, AccessToken token, RealmModel realm, ClientModel client, UserModel user,
                                             UserSessionModel userSession, ClientSessionModel clientSession) {
-        Set<ProtocolMapperModel> mappings = new ClientSessionCode(realm, clientSession).getRequestedProtocolMappers();
+        Set<ProtocolMapperModel> mappings = new ClientSessionCode(session, realm, clientSession).getRequestedProtocolMappers();
         KeycloakSessionFactory sessionFactory = session.getKeycloakSessionFactory();
         for (ProtocolMapperModel mapping : mappings) {
 

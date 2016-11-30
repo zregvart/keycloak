@@ -18,6 +18,7 @@ package org.keycloak.broker.wsfed;
 
 import org.keycloak.broker.provider.AbstractIdentityProviderFactory;
 import org.keycloak.models.IdentityProviderModel;
+import org.keycloak.models.KeycloakSession;
 
 import java.io.InputStream;
 import java.util.HashMap;
@@ -33,12 +34,12 @@ public class WSFedIdentityProviderFactory extends AbstractIdentityProviderFactor
     }
 
     @Override
-    public WSFedIdentityProvider create(IdentityProviderModel model) {
-        return new WSFedIdentityProvider(new WSFedIdentityProviderConfig(model));
+    public WSFedIdentityProvider create(KeycloakSession session, IdentityProviderModel model) {
+        return new WSFedIdentityProvider(session, new WSFedIdentityProviderConfig(model));
     }
 
     @Override
-    public Map<String, String> parseConfig(InputStream inputStream) {
+    public Map<String, String> parseConfig(KeycloakSession session, InputStream inputStream) {
         //TODO: Implement parsing of metadata
         return new HashMap<String, String>();
     }

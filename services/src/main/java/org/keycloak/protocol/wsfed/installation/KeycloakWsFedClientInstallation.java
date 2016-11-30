@@ -19,7 +19,9 @@
 package org.keycloak.protocol.wsfed.installation;
 
 import org.keycloak.Config;
+import org.keycloak.common.util.PemUtils;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.KeyManager;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.RealmModel;
@@ -46,12 +48,17 @@ public class KeycloakWsFedClientInstallation implements ClientInstallationProvid
         SamlClient samlClient = new SamlClient(client);
         StringBuffer buffer = new StringBuffer();
         buffer.append("<keycloak-wsfed-adapter>\n");
-        baseXml(realm, client, baseUri, samlClient, buffer);
+        baseXml(session, realm, client, baseUri, samlClient, buffer);
         buffer.append("</keycloak-wsfed-adapter>\n");
         return Response.ok(buffer.toString(), MediaType.TEXT_PLAIN_TYPE).build();
     }
 
-    public static void baseXml(RealmModel realm, ClientModel client, URI baseUri, SamlClient samlClient, StringBuffer buffer) {
+    private static String getRealmCertificatePem(KeycloakSession session, RealmModel realm) {
+        KeyManager keys = session.keys();
+        return PemUtils.encodeCertificate(keys.getActiveKey(realm).getCertificate());
+    }
+
+    public static void baseXml(KeycloakSession session, RealmModel realm, ClientModel client, URI baseUri, SamlClient samlClient, StringBuffer buffer) {
         buffer.append("    <SP entityID=\"").append(client.getClientId()).append("\"\n");
         buffer.append("        sslPolicy=\"").append(realm.getSslRequired().name()).append("\"\n");
         buffer.append("        logoutPage=\"SPECIFY YOUR LOGOUT PAGE!\">\n");
@@ -119,7 +126,7 @@ public class KeycloakWsFedClientInstallation implements ClientInstallationProvid
             buffer.append("            <Keys>\n");
             buffer.append("                <Key signing=\"true\">\n");
             buffer.append("                    <CertificatePem>\n");
-            buffer.append("                       ").append(realm.getCertificatePem()).append("\n");
+            buffer.append("                       ").append(getRealmCertificatePem(session, realm)).append("\n");
             buffer.append("                    </CertificatePem>\n");
             buffer.append("                </Key>\n");
             buffer.append("            </Keys>\n");

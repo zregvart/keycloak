@@ -62,7 +62,7 @@ public class SAML2RequestedTokenTest {
         WSFedIdentityProviderConfig config = mock(WSFedIdentityProviderConfig.class);
         when(config.getWsFedRealm()).thenReturn(mockHelper.getClientId());
 
-        Response response = rt.validate(mockHelper.getRealm().getPublicKey(), config, mock(EventBuilder.class), mockHelper.getSession());
+        Response response = rt.validate(mockHelper.getPublicKey(), config, mock(EventBuilder.class), mockHelper.getSession());
         assertNull(response);
         verifyZeroInteractions(mockHelper.getLoginFormsProvider());
     }
@@ -109,7 +109,7 @@ public class SAML2RequestedTokenTest {
 
         EventBuilder event = mock(EventBuilder.class);
 
-        Response response = rt.validate(mockHelper.getRealm().getPublicKey(), config, event, mockHelper.getSession());
+        Response response = rt.validate(mockHelper.getPublicKey(), config, event, mockHelper.getSession());
         assertNotNull(response);
 
         verify(event, times(1)).error(Errors.EXPIRED_CODE);
@@ -127,7 +127,7 @@ public class SAML2RequestedTokenTest {
 
         EventBuilder event = mock(EventBuilder.class);
 
-        Response response = rt.validate(mockHelper.getRealm().getPublicKey(), config, event, mockHelper.getSession());
+        Response response = rt.validate(mockHelper.getPublicKey(), config, event, mockHelper.getSession());
         assertNotNull(response);
 
         verify(event, times(1)).error(Errors.INVALID_SAML_RESPONSE);
@@ -188,7 +188,7 @@ public class SAML2RequestedTokenTest {
         Document doc = AssertionUtil.asDocument(originalAssertion);
         encryptDocument(doc, mockHelper);
 
-        AssertionType decryptedAssertion = rt.getAssertionType(doc.getDocumentElement(), mockHelper.getRealm());
+        AssertionType decryptedAssertion = rt.getAssertionType(mockHelper.getSession(), doc.getDocumentElement(), mockHelper.getRealm());
 
         //Check a few things just to make sure it decrypted
         assertEquals(originalAssertion.getIssuer().getValue(), decryptedAssertion.getIssuer().getValue());
@@ -202,7 +202,7 @@ public class SAML2RequestedTokenTest {
         WSFedEndpoint endpoint = new WSFedEndpoint(null, null, null, null);
         RequestSecurityTokenResponse rstr = endpoint.getWsfedToken(wsfedResponse);
 
-        return new SAML2RequestedToken(wsfedResponse, rstr.getRequestedSecurityToken().getAny().get(0), mockHelper.getRealm());
+        return new SAML2RequestedToken(mockHelper.getSession(), wsfedResponse, rstr.getRequestedSecurityToken().getAny().get(0), mockHelper.getRealm());
     }
 
     public static RequestSecurityTokenResponseBuilder generateRequestSecurityTokenResponseBuilder(MockHelper mockHelper) throws Exception {
@@ -219,8 +219,8 @@ public class SAML2RequestedTokenTest {
                 .setContext("context")
                 .setTokenExpiration(mockHelper.getAccessTokenLifespan())
                 .setRequestIssuer("https://issuer")
-                .setSigningKeyPair(new KeyPair(mockHelper.getRealm().getPublicKey(), mockHelper.getRealm().getPrivateKey()))
-                .setSigningCertificate(mockHelper.getRealm().getCertificate());
+                .setSigningKeyPair(new KeyPair(mockHelper.getPublicKey(), mockHelper.getPrivateKey()))
+                .setSigningCertificate(mockHelper.getCertificate());
 
         //SAML Token generation
         WSFedSAML2AssertionTypeBuilder samlBuilder = new WSFedSAML2AssertionTypeBuilder();
@@ -249,7 +249,7 @@ public class SAML2RequestedTokenTest {
 
             // encrypt the Assertion element and replace it with a EncryptedAssertion element.
             XMLEncryptionUtil.encryptElement(new QName(JBossSAMLURIConstants.ASSERTION_NSURI.get(),
-                            JBossSAMLConstants.ASSERTION.get(), samlNSPrefix), samlDocument, mockHelper.getRealm().getPublicKey(),
+                            JBossSAMLConstants.ASSERTION.get(), samlNSPrefix), samlDocument, mockHelper.getPublicKey(),
                     secretKey, 128, encryptedAssertionElementQName, true);
         } catch (Exception e) {
             throw new ProcessingException("failed to encrypt", e);
