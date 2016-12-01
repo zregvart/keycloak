@@ -43,7 +43,7 @@ import java.util.Map;
 
 public class ValidateX509CertificateUsername extends AbstractX509ClientCertificateDirectGrantAuthenticator {
 
-    protected static Logger logger = Logger.getLogger(ValidateX509CertificateUsername.class);
+    protected static final Logger logger = Logger.getLogger(ValidateX509CertificateUsername.class);
 
     @Override
     public void authenticate(AuthenticationFlowContext context) {

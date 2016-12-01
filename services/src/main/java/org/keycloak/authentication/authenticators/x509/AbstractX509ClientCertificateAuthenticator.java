@@ -26,16 +26,10 @@ import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.models.*;
-import org.keycloak.models.utils.FormMessage;
-import org.keycloak.services.ServicesLogger;
 
 import javax.ws.rs.core.Response;
-import java.security.KeyStore;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -47,7 +41,7 @@ import java.util.function.Function;
 public abstract class AbstractX509ClientCertificateAuthenticator implements Authenticator {
 
     public static final String DEFAULT_ATTRIBUTE_NAME = "usercertificate";
-    protected static Logger logger = Logger.getLogger(AbstractX509ClientCertificateAuthenticator.class);
+    protected static final Logger logger = Logger.getLogger(AbstractX509ClientCertificateAuthenticator.class);
 
     public static final String JAVAX_SERVLET_REQUEST_X509_CERTIFICATE = "javax.servlet.request.X509Certificate";
 

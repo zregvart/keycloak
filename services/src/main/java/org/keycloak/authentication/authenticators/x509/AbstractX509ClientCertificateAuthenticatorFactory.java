@@ -23,9 +23,7 @@ import org.keycloak.Config;
 import org.keycloak.authentication.AuthenticatorFactory;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
-import org.keycloak.services.ServicesLogger;
 
-import java.security.KeyStore;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -72,7 +70,7 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         mappingMethodList.setLabel("User Identity Source");
         mappingMethodList.setHelpText("Choose how to extract user identity from X509 certificate or the certificate fields. For example, SubjectDN will match the custom regular expression specified below to the value of certificate's SubjectDN field.");
         mappingMethodList.setDefaultValue(mappingSources[0]);
-        mappingMethodList.setDefaultValue(mappingSourceTypes);
+        mappingMethodList.setOptions(mappingSourceTypes);
 
         ProviderConfigProperty regExp = new ProviderConfigProperty();
         regExp.setType(STRING_TYPE);
@@ -92,7 +90,7 @@ public abstract class AbstractX509ClientCertificateAuthenticatorFactory implemen
         userMapperList.setHelpText("Choose how to map extracted user identities to users");
         userMapperList.setLabel("User mapping method");
         userMapperList.setDefaultValue(userModelMappers[0]);
-        userMapperList.setDefaultValue(mapperTypes);
+        userMapperList.setOptions(mapperTypes);
 
         ProviderConfigProperty attributeOrPropertyValue = new ProviderConfigProperty();
         attributeOrPropertyValue.setType(STRING_TYPE);

@@ -36,7 +36,6 @@ import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author <a href="mailto:pnalyvayko@agi.com">Peter Nalyvayko</a>
@@ -45,7 +44,7 @@ import java.util.Map;
  */
 public class X509ClientCertificateAuthenticator extends AbstractX509ClientCertificateAuthenticator {
 
-    protected static Logger logger = Logger.getLogger(X509ClientCertificateAuthenticator.class);
+    protected static final Logger logger = Logger.getLogger(X509ClientCertificateAuthenticator.class);
 
     @Override
     public void close() {
