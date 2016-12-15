@@ -18,7 +18,9 @@
 
 package org.keycloak.testsuite.forms.x509;
 
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel;
 import org.keycloak.representations.idm.AuthenticatorConfigRepresentation;
@@ -31,6 +33,9 @@ import static org.junit.Assert.assertEquals;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.IdentityMapperType.USERNAME_EMAIL;
 import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorConfigModel.MappingSourceType.SUBJECTDN_EMAIL;
 
+import io.undertow.Undertow;
+import io.undertow.server.handlers.BlockingHandler;
+
 /**
  * Verifies Certificate revocation using OCSP responder.
  * The tests rely on an OCSP responder service listening
@@ -41,6 +46,12 @@ import static org.keycloak.authentication.authenticators.x509.X509AuthenticatorC
  */
 
 public class X509OCSPResponderTest extends AbstractX509AuthenticationTest {
+
+    private static final String OCSP_RESPONDER_HOST = "localhost";
+
+    private static final int OCSP_RESPONDER_PORT = 8888;
+
+    private Undertow ocspResponder;
 
     @Test
     public void loginFailedOnOCSPResponderRevocationCheck() throws Exception {
@@ -60,6 +71,19 @@ public class X509OCSPResponderTest extends AbstractX509AuthenticationTest {
         assertEquals("invalid_request", response.getError());
 
         Assert.assertThat(response.getErrorDescription(), containsString("Certificate's been revoked."));
+    }
+
+    @Before
+    public void startOCSPResponder() throws Exception {
+        ocspResponder = Undertow.builder().addHttpListener(OCSP_RESPONDER_PORT, OCSP_RESPONDER_HOST)
+                .setHandler(new BlockingHandler(new OcspHandler())).build();
+
+        ocspResponder.start();
+    }
+
+    @After
+    public void stopOCSPResponder() {
+        ocspResponder.stop();
     }
 
 }
