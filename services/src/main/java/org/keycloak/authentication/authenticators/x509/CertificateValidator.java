@@ -264,7 +264,7 @@ public class CertificateValidator {
         }
 
         private Collection<X509CRL> loadCRLFromLDAP(CertificateFactory cf, URI remoteURI) throws GeneralSecurityException {
-            Hashtable env = new Hashtable(11);
+            Hashtable<String, String> env = new Hashtable<>(2);
             env.put(Context.INITIAL_CONTEXT_FACTORY, ldapContext.getLdapFactoryClassName());
             env.put(Context.PROVIDER_URL, remoteURI.toString());
 
