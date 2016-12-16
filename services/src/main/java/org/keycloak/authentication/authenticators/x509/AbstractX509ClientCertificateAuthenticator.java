@@ -109,7 +109,7 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
             try {
                 return new JcaX509CertificateHolder(certs[0]).getSubject();
             } catch (CertificateEncodingException e) {
-                e.printStackTrace();
+                logger.warn("Unable to get certificate Subject", e);
             }
             return null;
         };
@@ -118,7 +118,7 @@ public abstract class AbstractX509ClientCertificateAuthenticator implements Auth
             try {
                 return new JcaX509CertificateHolder(certs[0]).getIssuer();
             } catch (CertificateEncodingException e) {
-                e.printStackTrace();
+                logger.warn("Unable to get certificate Issuer", e);
             }
             return null;
         };
