@@ -30,6 +30,8 @@ import static org.keycloak.authentication.authenticators.x509.AbstractX509Client
 
 public class X509AuthenticatorConfigModel extends AuthenticatorConfigModel {
 
+    private static final long serialVersionUID = 1L;
+
     public enum IdentityMapperType {
         USER_ATTRIBUTE(USER_ATTRIBUTE_MAPPER),
         USERNAME_EMAIL(USERNAME_EMAIL_MAPPER);
