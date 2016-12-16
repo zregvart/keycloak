@@ -464,7 +464,6 @@ public class CertificateValidator {
     }
 
     private static void checkRevocationStatusUsingCRL(X509Certificate[] certs, CRLLoaderImpl crLoader) throws GeneralSecurityException {
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
         Collection<X509CRL> crlColl = crLoader.getX509CRLs();
         if (crlColl != null && crlColl.size() > 0) {
             for (X509CRL it : crlColl) {
