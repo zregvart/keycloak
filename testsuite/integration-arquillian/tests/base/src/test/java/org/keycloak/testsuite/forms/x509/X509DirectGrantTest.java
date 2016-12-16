@@ -166,10 +166,9 @@ public class X509DirectGrantTest extends AbstractX509AuthenticationTest {
         events.clear();
 
         oauth.clientId("resource-owner");
-        OAuthClient.AccessTokenResponse response;
-        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
-        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
-        response = oauth.doGrantAccessTokenRequest("secret", "", "", null);
+        oauth.doGrantAccessTokenRequest("secret", "", "", null);
+        oauth.doGrantAccessTokenRequest("secret", "", "", null);
+        oauth.doGrantAccessTokenRequest("secret", "", "", null);
 
         events.clear();
     }
