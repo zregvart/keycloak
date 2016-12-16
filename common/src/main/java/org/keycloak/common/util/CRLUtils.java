@@ -18,17 +18,22 @@
 
 package org.keycloak.common.util;
 
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.DERIA5String;
-import org.bouncycastle.asn1.DEROctetString;
-import org.bouncycastle.asn1.x509.*;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.DERIA5String;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.x509.CRLDistPoint;
+import org.bouncycastle.asn1.x509.DistributionPoint;
+import org.bouncycastle.asn1.x509.DistributionPointName;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 
 /**
  * @author <a href="mailto:brat000012001@gmail.com">Peter Nalyvayko</a>
@@ -53,16 +58,21 @@ public final class CRLUtils {
      */
     public static List<String> getCRLDistributionPoints(X509Certificate cert) throws IOException {
         byte[] data = cert.getExtensionValue(CRL_DISTRIBUTION_POINTS_OID);
-        if (data == null)
-            return new ArrayList<>();
+        if (data == null) {
+            return Collections.emptyList();
+        }
 
-        List<String> dps = new LinkedList<>();
-        ASN1InputStream is = new ASN1InputStream(new ByteArrayInputStream(data));
-        DEROctetString octetString = (DEROctetString)is.readObject();
+        List<String> distributionPointUrls = new LinkedList<>();
+        DEROctetString octetString;
+        try (ASN1InputStream crldpExtensionInputStream = new ASN1InputStream(new ByteArrayInputStream(data))) {
+            octetString = (DEROctetString)crldpExtensionInputStream.readObject();
+        }
         byte[] octets = octetString.getOctets();
 
-        ASN1InputStream is2 = new ASN1InputStream(new ByteArrayInputStream(octets));
-        CRLDistPoint crlDP = CRLDistPoint.getInstance(is2.readObject());
+        CRLDistPoint crlDP;
+        try (ASN1InputStream crldpInputStream = new ASN1InputStream(new ByteArrayInputStream(octets))) {
+            crlDP = CRLDistPoint.getInstance(crldpInputStream.readObject());
+        }
 
         for (DistributionPoint dp : crlDP.getDistributionPoints()) {
             DistributionPointName dpn = dp.getDistributionPoint();
@@ -71,13 +81,13 @@ public final class CRLUtils {
                 for (GeneralName gn : names) {
                     if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
                         String url = DERIA5String.getInstance(gn.getName()).getString();
-                        dps.add(url);
+                        distributionPointUrls.add(url);
                     }
                 }
             }
         }
 
-        return dps;
+        return distributionPointUrls;
     }
 
 }
