@@ -40,6 +40,7 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPRespBuilder;
 import org.bouncycastle.cert.ocsp.CertificateID;
+import org.bouncycastle.cert.ocsp.CertificateStatus;
 import org.bouncycastle.cert.ocsp.OCSPReq;
 import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.OCSPRespBuilder;
@@ -70,7 +71,8 @@ final class OcspHandler implements HttpHandler {
 
     private static final String OCSP_RESPONDER_KEYPAIR_PATH = "/client-auth-test/intermediate-ca.key";
 
-    private static final Map<BigInteger, RevokedStatus> REVOKED_CERTIFICATES_STATUS = ImmutableMap
+    // add any certificates that the OCSP responder needs to know about in the tests here
+    private static final Map<BigInteger, CertificateStatus> REVOKED_CERTIFICATES_STATUS = ImmutableMap
             .of(BigInteger.valueOf(4096), new RevokedStatus(new Date(1472169600000L), CRLReason.unspecified));
 
     private final SubjectPublicKeyInfo subjectPublicKeyInfo;
